@@ -1,0 +1,8 @@
+build
+hearing_model.egg-info
+venv
+x64
+.vs
+Debug
+x64
+*pyc
