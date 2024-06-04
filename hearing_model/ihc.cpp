@@ -17,876 +17,562 @@
  *
  */
 
+#include<array>
+#include <functional>
+#include <iomanip>
+
 #include "bruce2018.h"
+
+static constexpr double TWO_PI = 2.0 * M_PI;
+
+namespace ihc
+{
+	static double get_q10(const double cf, const Species species)
+	{
+		switch (species)
+		{
+		case CAT:
+			return pow(10, 0.4708 * log10(cf / 1e3) + 0.4664);
+		case HUMAN_SHERA:
+			return pow((cf / 1000), 0.3) * 12.7 * 0.505 + 0.2085;
+		case HUMAN_GLASSBERG_MOORE:
+			return cf / 24.7 / (4.37 * (cf / 1000) + 1) * 0.505 + 0.2085;
+		}
+	}
+
+	static double get_center_frequency(const double cf, const Species species)
+	{
+		/** Calculate the center frequency for the control-path wideband filter
+			from the location on basilar membrane, based on Greenwood (JASA 1990) */
+		if (species == CAT) /* for cat */
+		{
+			/* Cat frequency shift corresponding to 1.2 mm */
+			const double bm_place = 11.9 * log10(0.80 + cf / 456.0);
+			/* Calculate the location on basilar membrane from CF */
+			return 456.0 * (pow(10, (bm_place + 1.2) / 11.9) - 0.80); /* shift the center freq */
+		}
+
+		/* Human frequency shift corresponding to 1.2 mm */
+		const double bm_place = (35 / 2.1) * log10(1.0 + cf / 165.4);
+		/* Calculate the location on basilar membrane from CF */
+		return 165.4 * (pow(10, (bm_place + 1.2) / (35 / 2.1)) - 1.0); /* shift the center freq */
+	}
+
+	/* -------------------------------------------------------------------------------------------- */
+	/** Calculate the delay (basilar membrane, synapse, etc. for cat) */
+	double delay_cat(const double cf)
+	{
+		double A0 = 3.0;
+		double A1 = 12.5;
+		double x = 11.9 * log10(0.80 + cf / 456.0); /* cat mapping */
+		double delay = A0 * exp(-x / A1) * 1e-3;
+
+		return (delay);
+	}
+
+	struct MiddleEarFilter
+	{
+		double gain_max;
+		std::array<std::array<double, 6>, 3> m;
+		std::array<double, 3> mey1, mey2, mey3, px_cache;
+		size_t i;
+
+		MiddleEarFilter(const double time_resolution, const Species species): m{}, mey1{}, mey2{}, mey3{}, px_cache{},
+		                                                                      i{0}
+		{
+			const double c = (TWO_PI * 1e3 / tan(TWO_PI / 2 * 1e3 * time_resolution));
+			if (species == CAT) /* for cat */
+			{
+				/* Cat middle-ear filter - simplified version from Bruce et al. (JASA 2003) */
+				m[0][0] = c / (c + 693.48);
+				m[0][1] = (693.48 - c) / c;
+				m[0][2] = 0.0;
+				m[0][3] = 1.0;
+				m[0][4] = -1.0;
+				m[0][5] = 0.0;
+				m[1][0] = 1 / (pow(c, 2) + 11053 * c + 1.163e8);
+				m[1][1] = -2 * pow(c, 2) + 2.326e8;
+				m[1][2] = pow(c, 2) - 11053 * c + 1.163e8;
+				m[1][3] = pow(c, 2) + 1356.3 * c + 7.4417e8;
+				m[1][4] = -2 * pow(c, 2) + 14.8834e8;
+				m[1][5] = pow(c, 2) - 1356.3 * c + 7.4417e8;
+				m[2][0] = 1 / (pow(c, 2) + 4620 * c + 909059944);
+				m[2][1] = -2 * pow(c, 2) + 2 * 909059944;
+				m[2][2] = pow(c, 2) - 4620 * c + 909059944;
+				m[2][3] = 5.7585e5 * c + 7.1665e7;
+				m[2][4] = 14.333e7;
+				m[2][5] = 7.1665e7 - 5.7585e5 * c;
+				gain_max = 41.1405;
+			}
+			else /* for human */
+			{
+				/* Human middle-ear filter - based on Pascal et al. (JASA 1998)  */
+				m[0][0] = 1 / (pow(c, 2) + 5.9761e+003 * c + 2.5255e+007);
+				m[0][1] = (-2 * pow(c, 2) + 2 * 2.5255e+007);
+				m[0][2] = (pow(c, 2) - 5.9761e+003 * c + 2.5255e+007);
+				m[0][3] = (pow(c, 2) + 5.6665e+003 * c);
+				m[0][4] = -2 * pow(c, 2);
+				m[0][5] = (pow(c, 2) - 5.6665e+003 * c);
+				m[1][0] = 1 / (pow(c, 2) + 6.4255e+003 * c + 1.3975e+008);
+				m[1][1] = (-2 * pow(c, 2) + 2 * 1.3975e+008);
+				m[1][2] = (pow(c, 2) - 6.4255e+003 * c + 1.3975e+008);
+				m[1][3] = (pow(c, 2) + 5.8934e+003 * c + 1.7926e+008);
+				m[1][4] = (-2 * pow(c, 2) + 2 * 1.7926e+008);
+				m[1][5] = (pow(c, 2) - 5.8934e+003 * c + 1.7926e+008);
+				m[2][0] = 1 / (pow(c, 2) + 2.4891e+004 * c + 1.2700e+009);
+				m[2][1] = (-2 * pow(c, 2) + 2 * 1.2700e+009);
+				m[2][2] = (pow(c, 2) - 2.4891e+004 * c + 1.2700e+009);
+				m[2][3] = (3.1137e+003 * c + 6.9768e+008);
+				m[2][4] = 2 * 6.9768e+008;
+				m[2][5] = (-3.1137e+003 * c + 6.9768e+008);
+				gain_max = 2;
+			}
+		}
+
+		double operator()(const double px)
+		{
+			const size_t i0 = i % 3;
+			const size_t i1 = (i - 1) % 3;
+			const size_t i2 = (i++ - 2) % 3;
+			px_cache[i0] = px;
+
+			mey1[i0] = m[0][0] * (-m[0][1] * mey1[i1] - m[0][2] * mey1[i2] + m[0][3] * px_cache[i0] + m[0][4] * px_cache
+				[i1] + m[0][5] * px_cache[i2]);
+			mey2[i0] = m[1][0] * (-m[1][1] * mey2[i1] - m[1][2] * mey2[i2] + m[1][3] * mey1[i0] + m[1][4] * mey1[i1] + m
+				[1][5] * mey1[i2]);
+			mey3[i0] = m[2][0] * (-m[2][1] * mey3[i1] - m[2][2] * mey3[i2] + m[2][3] * mey2[i0] + m[2][4] * mey2[i1] + m
+				[2][5] * mey2[i2]);
+			return mey3[i0] / gain_max;
+		}
+	};
+
+	struct WideBandGammaToneFilter
+	{
+		double time_resolution;
+		double center_freq;
+		int order;
+		double cf;
+		double delta_phase;
+		double phase;
+		std::array<std::complex<double>, 4> gtf;
+		std::array<std::complex<double>, 4> gtf_last;
+
+		double tau_wb_max;
+		double tau_wb_min;
+		double tau_wb;
+		double bm_tau_min;
+		double bm_tau_max;
+		double tau_max;
+		double tau_min;
+		double ratio_bm;
+		double wb_gain;
+
+		double tmpcos;
+
+		std::vector<double> gain_delay;
+		double previous_gain;
+
+		WideBandGammaToneFilter(
+			const double time_resolution,
+			const double cf,
+			const Species species,
+			const double cohc
+		)
+			:
+			time_resolution(time_resolution),
+			center_freq(get_center_frequency(cf, species)),
+			order(3),
+			cf(cf),
+			delta_phase(-TWO_PI * center_freq * time_resolution),
+			phase(0.0),
+			previous_gain(0.0)
+		{
+			const double gain = max(min(52.0 / 2.0 * (tanh(2.2 * log10(cf / 0.6e3) + 0.15) + 1.0), 60.0), 15.0);
+			const double ratio = pow(10, (-gain / (20.0 * order)));
+			const double bw = cf / get_q10(cf, species);
+			tau_max = 2.0 / (TWO_PI * bw);
+			tau_min = tau_max * ratio;
+
+			tau_wb_max = tau_min + 0.2 * (tau_max - tau_min);
+			tau_wb_min = tau_wb_max / tau_max * tau_min;
+
+			constexpr double bw_factor = 0.7;
+			constexpr double factor = 2.5;
+			ratio_bm = pow(10, (-gain / (20.0 * factor)));
+			bm_tau_max = tau_max / bw_factor;
+			bm_tau_min = bm_tau_max * ratio_bm;
+
+			tmpcos = cos(TWO_PI * (center_freq - cf) * time_resolution);
+			gain_delay.resize(1 + static_cast<int>(floor(1.0 / (2.0 * std::sqrt(1 - pow(tmpcos, 2))))));
+
+			shift_poles(cohc * (bm_tau_max - bm_tau_min) + bm_tau_min, 0);
+			wb_gain = previous_gain;
+		}
+
+
+		double operator()(const double me_out)
+		{
+			phase += delta_phase;
+
+			const double dt = tau_wb * 2.0 / time_resolution;
+			const double c1_lp = (dt - 1) / (dt + 1);
+			const double c2_lp = 1.0 / (dt + 1);
+
+			gtf[0] = std::complex<double>(cos(phase), sin(phase)) * me_out;
+
+			/* IIR Bi-linear transformation LPF */
+			for (int j = 1; j <= order; j++)
+				gtf[j] = ((c2_lp * wb_gain) * (gtf[j - 1] + gtf_last[j - 1])) + (c1_lp * gtf_last[j]);
+
+			const double out = (cos(-phase) * gtf[order].real()) - (sin(-phase) * gtf[order].imag());
+
+			for (int i = 0; i <= order; i++)
+				gtf_last[i] = gtf[i];
+
+			return pow((tau_wb / tau_wb_max), order) * out * 10e3 * std::max(1., cf / 5e3);
+		}
+
+		//! shift of the location of poles of the C1 filter from the initial positions
+		void shift_poles(const double tau_c1, const size_t n)
+		{
+			tau_wb = tau_wb_max + (tau_c1 - bm_tau_max) * (tau_wb_max - tau_wb_min) / (bm_tau_max - bm_tau_min);
+
+			const auto [current_gain, current_gain_delay] = calculate_gain_delay();
+
+			gain_delay[(n + current_gain_delay) % gain_delay.size()] = previous_gain;
+
+			// TODO: can we optimize this?
+			if (gain_delay[n % gain_delay.size()] == 0)
+				gain_delay[n % gain_delay.size()] = previous_gain;
+
+			previous_gain = current_gain;
+
+			wb_gain = gain_delay[n % gain_delay.size()];
+			gain_delay[n % gain_delay.size()] = 0.0;
+		}
+
+		[[nodiscard]] std::pair<double, int> calculate_gain_delay() const
+		{
+			const double dt = tau_wb * 2.0 / time_resolution;
+			const double c1_lp = (dt - 1) / (dt + 1);
+			const double c2_lp = 1.0 / (dt + 1);
+			const double tmp1 = 1 + c1_lp * c1_lp - 2 * c1_lp * tmpcos;
+			const double tmp2 = 2 * c2_lp * c2_lp * (1 + tmpcos);
+			const int current_gain_delay = static_cast<int>(floor(
+				0.5 - (c1_lp * c1_lp - c1_lp * tmpcos) / (1 + c1_lp * c1_lp - 2 * c1_lp * tmpcos)));
+			const double current_gain = pow(tmp1 / tmp2, 1.0 / 2.0);
+			return {current_gain, current_gain_delay};
+		}
+	};
+
+	struct BoltzmanFilter
+	{
+		double asymptote;
+
+		double operator()(const double wb_out) const
+		{
+			constexpr double s0 = 12.0;
+			constexpr double s1 = 5.0;
+			constexpr double x1 = 5.0;
+
+
+			const double shift = 1.0 / (1.0 + asymptote);
+			const double x0 = s0 * log((1.0 / shift - 1) / (1 + exp(x1 / s1)));
+			const double out1 = 1.0 / (1.0 + exp(-(wb_out - x0) / s0) * (1.0 + exp(-(wb_out - x1) / s1))) - shift;
+			const double out = out1 / (1 - shift);
+			return out;
+		}
+	};
+
+	template <int Order>
+	struct LowPassFilter
+	{
+		double c1_lp;
+		double c2_lp;
+		std::array<double, Order + 1> ohc;
+		std::array<double, Order + 1> ohc_last;
+
+		LowPassFilter(const double time_resolution, const double fc): ohc{}, ohc_last{}
+		{
+			const double c = 2.0 / time_resolution;
+			c1_lp = (c - TWO_PI * fc) / (c + TWO_PI * fc);
+			c2_lp = TWO_PI * fc / (TWO_PI * fc + c);
+		}
+
+		double operator()(const double x)
+		{
+			constexpr double gain = 1.0;
+
+			ohc[0] = x * gain;
+			for (int i = 0; i < Order; i++)
+				ohc[i + 1] = c1_lp * ohc_last[i + 1] + c2_lp * (ohc[i] + ohc_last[i]);
+
+			for (int j = 0; j <= Order; j++)
+				ohc_last[j] = ohc[j];
+
+			return ohc[Order];
+		}
+	};
+
+	struct PostOhcFilter
+	{
+		double cohc;
+		double bm_tau_min;
+		double bm_tau_max;
+		double min_r;
+		double s0;
+
+		PostOhcFilter(const double cohc, const double bm_tau_min, const double bm_tau_max, const double asym)
+			: cohc(cohc),
+			  bm_tau_min(bm_tau_min),
+			  bm_tau_max(bm_tau_max),
+			  min_r(0.05)
+		{
+			const double r = bm_tau_min / bm_tau_max;
+			if (r < min_r)
+				min_r = 0.5 * r;
+
+			const double dc = (asym - 1) / (asym + 1.0) / 2.0 - min_r;
+			const double r1 = r - min_r;
+			s0 = -dc / log(r1 / (1 - min_r));
+		}
+
+		double operator()(const double x) const
+		{
+			const double x1 = fabs(x);
+			double out = std::min(std::max(bm_tau_max * (min_r + (1.0 - min_r) * exp(-x1 / s0)), bm_tau_min),
+			                      bm_tau_max);
+
+			out = cohc * (out - bm_tau_min) + bm_tau_min;
+
+			if (1 / out < 0.0)
+				printf("The poles are in the right-half plane; system is unstable.\n");
+			return out;
+		}
+	};
+
+	struct LogarithmicTransductionFunction
+	{
+		double slope;
+		double asymptote;
+		double strength;
+
+		LogarithmicTransductionFunction(const double slope, const double asym):
+			slope(slope),
+			asymptote(asym),
+			strength(20.0e6 / pow(10, 80.0 / 20))
+		{
+		}
+
+		double operator()(const double x) const
+		{
+			const double xx = log(1.0 + strength * fabs(x)) * slope;
+
+			if (x < 0)
+			{
+				const double splx = 20 * log10(-x / 20e-6);
+				const double asym_t = asymptote - (asymptote - 1) / (1 + exp(splx / 5.0));
+				return -1 / asym_t * xx;
+			}
+			return xx;
+		}
+	};
+
+	struct ChirpFilter
+	{
+		double time_resolution;
+		double cf;
+		double tau_max;
+
+		double init_phase;
+		double gain_norm;
+
+		std::array<std::array<double, 4>, 12> input;
+		std::array<std::array<double, 4>, 12> output;
+		std::array<std::complex<double>, 11> phase_array;
+
+		double sigma0;
+		double ipw;
+		double ipb;
+		double rpa;
+		double r0;
+		double fs_bi_linear;
+		double gain_denominator;
+		bool c1;
+
+		ChirpFilter(const double time_resolution, const double cf_in, const double bm_tau_max, const bool c1 = true) :
+			time_resolution(time_resolution),
+			cf(cf_in * TWO_PI),
+			tau_max(bm_tau_max),
+			init_phase(0.0),
+			gain_norm(1.0),
+			input{},
+			output{},
+			phase_array{},
+			sigma0{1 / bm_tau_max},
+			ipw{1.01 * cf - 50},
+			ipb{0.2343 * cf - 1104},
+			rpa{pow(10, log10(cf_in) * 0.9 + 0.55) + 2000},
+			r0{-(pow(10, log10(cf_in) * 0.7 + 1.6) + 500)},
+			fs_bi_linear{cf / tan(cf * time_resolution / 2)},
+			gain_denominator{pow(sqrt(cf * cf + r0 * r0), 5)},
+			c1(c1)
+
+		{
+			fill_phase_array(0.0);
+
+			for (int i = 1; i <= 5; i++)
+			{
+				const auto& p = phase_array[i * 2 - 1];
+				init_phase += atan(cf / -r0) - atan((cf - p.imag()) / -p.real()) - atan((cf + p.imag()) / -p.real());
+			}
+
+			for (int r = 1; r <= 10; r++)
+				gain_norm *= pow((cf - phase_array[r].imag()), 2) + phase_array[r].real() * phase_array[r].real();
+		}
+
+		void fill_phase_array(const double r_sigma, const bool multiply = false)
+		{
+			phase_array[1].real(-sigma0 - r_sigma);
+			if (multiply)
+				phase_array[1].real(-sigma0 * r_sigma);
+
+			if (phase_array[1].real() > 0.0)
+				printf("The system becomes unstable.\n");
+
+			phase_array[1].imag(ipw);
+
+			phase_array[5].real(phase_array[1].real() - rpa);
+			phase_array[5].imag(phase_array[1].imag() - ipb);
+
+			phase_array[3].real((phase_array[1].real() + phase_array[5].real()) * 0.5);
+			phase_array[3].imag((phase_array[1].imag() + phase_array[5].imag()) * 0.5);
+
+			phase_array[2] = std::conj(phase_array[1]);
+			phase_array[4] = std::conj(phase_array[3]);
+			phase_array[6] = std::conj(phase_array[5]);
+
+			phase_array[7] = phase_array[1];
+			phase_array[8] = phase_array[2];
+			phase_array[9] = phase_array[5];
+			phase_array[10] = phase_array[6];
+		}
+
+
+		double operator()(const double me_out, const double r_sigma)
+		{
+			constexpr int order_of_zero = 5;
+			constexpr int half_order_pole = 5;
+
+
+			const double norm_gain = sqrt(gain_norm) / gain_denominator;
+
+			fill_phase_array(r_sigma, !c1);
+
+			double phase = 0.0;
+			for (int i = 1; i <= half_order_pole; i++)
+			{
+				const auto& p = phase_array[i * 2 - 1];
+				phase = phase - atan((cf - p.imag()) / -p.real()) - atan((cf + p.imag()) / -p.real());
+			}
+
+			r0 = -cf / tan((init_phase - phase) / order_of_zero);
+
+			if (r0 > 0.0)
+				printf("The zeros are in the right-half plane.\n");
+
+			input[1][3] = input[1][2];
+			input[1][2] = input[1][1];
+			input[1][1] = me_out;
+
+			double dy;
+			for (int i = 1; i <= half_order_pole; i++)
+			{
+				const auto& p = phase_array[i * 2 - 1];
+
+				const double temp = pow((fs_bi_linear - p.real()), 2) + pow(p.imag(), 2);
+				dy = input[i][1] * (fs_bi_linear - r0) - 2 * r0 * input[i][2] - (fs_bi_linear + r0) * input[i][3] + 2 *
+					output[i][1] * (fs_bi_linear * fs_bi_linear - p.real() * p.real() - p.imag() * p.imag()) - output[i]
+					[2] * ((fs_bi_linear + p.real()) * (fs_bi_linear + p.real()) + p.imag() * p.imag());
+
+				dy = dy / temp;
+
+
+				input[i + 1][3] = output[i][2];
+				input[i + 1][2] = output[i][1];
+				input[i + 1][1] = dy;
+
+				output[i][2] = output[i][1];
+				output[i][1] = dy;
+			}
+
+			dy = output[half_order_pole][1] * norm_gain; /* don't forget the gain term */
+			return dy / 4.0; /* signal path output is divided by 4 to give correct C1 filter gain */
+		}
+	};
+}
 
 
 std::vector<double> inner_hair_cell(
-    const std::vector<double> sound_wave,  
-    const double cf,
-    const size_t nrep,
-    const double binsize,
-    const double reptime,
-    const double cohc,
-    const double cihc,
-    const Species species) 
+	const std::vector<double> sound_wave,
+	const double cf,
+	const size_t nrep,
+	const double time_resolution,
+	const double reptime,
+	const double cohc,
+	const double cihc,
+	const Species species)
 {
-    const int totalstim = (int)floor(reptime / binsize + 0.5);
-    
-    if (species == CAT)
-        validate_parameter(cf, 124.9, 40.1e3, "cf");
-    else
-        validate_parameter(cf, 124.9, 20.1e3, "cf");
+	if (species == CAT)
+		utils::validate_parameter(cf, 124.9, 40.1e3, "cf");
+	else
+		utils::validate_parameter(cf, 124.9, 20.1e3, "cf");
 
-    validate_parameter(nrep, size_t{ 1 }, std::numeric_limits<size_t>::max(), "nrep");
-    validate_parameter(reptime, sound_wave.size() * binsize, std::numeric_limits<double>::infinity(), "reptime");
-    validate_parameter(cohc, 0., 1., "cohc");
-    validate_parameter(cihc, 0., 1., "cihc");
-         
-    std::vector<double> px = sound_wave;
-    px.resize(totalstim, 0.0);    
-    std::vector<double> ihcout(totalstim * nrep);
-    
-    IHCAN(px.data(), cf, static_cast<int>(nrep), binsize, totalstim, cohc, cihc, static_cast<int>(species), ihcout.data());
-    return ihcout;
+	utils::validate_parameter(nrep, size_t{1}, std::numeric_limits<size_t>::max(), "nrep");
+	utils::validate_parameter(reptime, static_cast<double>(sound_wave.size()) * time_resolution,
+	                          std::numeric_limits<double>::infinity(), "reptime");
+	utils::validate_parameter(cohc, 0., 1., "cohc");
+	utils::validate_parameter(cihc, 0., 1., "cihc");
+
+	const size_t total_timesteps = static_cast<size_t>(floor(reptime / time_resolution + 0.5));
+	std::vector<double> output(total_timesteps * nrep);
+
+	ihc::MiddleEarFilter me_filter(time_resolution, species);
+	ihc::WideBandGammaToneFilter wb_filter(time_resolution, cf, species, cohc);
+	ihc::BoltzmanFilter boltzman_filter{7.0};
+	ihc::LowPassFilter<2> ohc_low_pass_filter(time_resolution, 600.);
+	ihc::PostOhcFilter non_linear_after_ohc_filter{cohc, wb_filter.bm_tau_min, wb_filter.bm_tau_max, 7.0};
+	ihc::ChirpFilter c1_chirp_filter{time_resolution, cf, wb_filter.bm_tau_max, true};
+	ihc::ChirpFilter c2_chirp_filter{time_resolution, cf, wb_filter.bm_tau_max, false};
+	ihc::LogarithmicTransductionFunction ltf_1{0.1, 3.0};
+	ihc::LogarithmicTransductionFunction ltf_2{0.2, 1.0};
+	ihc::LowPassFilter<7> ihc_low_pass_filter(time_resolution, 3000);
+
+	const double delay = ihc::delay_cat(cf); // human uses same delay function
+	const int delay_point = std::max(0, static_cast<int>(ceil(delay / time_resolution)));
+
+	for (size_t n = 0; n < total_timesteps; n++)
+	{
+		const double px = n < sound_wave.size() ? sound_wave[n] : 0.0;
+		const double me_out = me_filter(px);
+		const double wb_out = wb_filter(me_out);
+		const double ohc_nonlinear_out = boltzman_filter(wb_out);
+		const double ohc_out = ohc_low_pass_filter(ohc_nonlinear_out);
+		const double tau_c1 = non_linear_after_ohc_filter(ohc_out);
+
+		wb_filter.shift_poles(tau_c1, n);
+
+		const double c1_filter_out = c1_chirp_filter(me_out, 1 / tau_c1 - 1 / wb_filter.bm_tau_max);
+		const double c2_filter_out = c2_chirp_filter(me_out, 1 / wb_filter.ratio_bm);
+
+		const double c1_ihc = ltf_1(cihc * c1_filter_out);
+		const double c2_ihc = -ltf_2(c2_filter_out * fabs(c2_filter_out) * cf / 10 * cf / 2e3);
+
+		const double ihc_out = ihc_low_pass_filter(c1_ihc + c2_ihc);
+
+		if (n + delay_point < total_timesteps)
+			for (size_t j = 0; j < nrep; j++)
+				output[(total_timesteps * j) + n + delay_point] = ihc_out;
+	}
+	return output;
 }
-
-void IHCAN(double* px, double cf, int nrep, double tdres, int totalstim,
-    double cohc, double cihc, int species, double* ihcout)
-{
-    /*variables for middle-ear model */
-    double megainmax;
-    double* mey1, * mey2, * mey3, meout, c1filterouttmp, c2filterouttmp, c1vihctmp, c2vihctmp;
-    double fp, C, m11, m12, m13, m14, m15, m16, m21, m22, m23, m24, m25, m26, m31, m32, m33, m34, m35, m36;
-
-    /*variables for the signal-path, control-path and onward */
-    double* ihcouttmp, * tmpgain;
-    int grd;
-
-    double bmplace, centerfreq, gain, taubm, ratiowb, bmTaubm, fcohc, TauWBMax, TauWBMin, tauwb;
-    double Taumin[1], Taumax[1], bmTaumin[1], bmTaumax[1], ratiobm[1], lasttmpgain, wbgain, ohcasym, ihcasym, delay;
-    int i, n, delaypoint, grdelay[1], bmorder, wborder;
-    double wbout1, wbout, ohcnonlinout, ohcout, tmptauc1, tauc1, rsigma, wb_gain;
-
-    /* Allocate dynamic memory for the temporary variables */
-    ihcouttmp = (double*)calloc(totalstim * nrep, sizeof(double));
-
-    mey1 = (double*)calloc(totalstim, sizeof(double));
-    mey2 = (double*)calloc(totalstim, sizeof(double));
-    mey3 = (double*)calloc(totalstim, sizeof(double));
-
-    tmpgain = (double*)calloc(totalstim, sizeof(double));
-
-    /** Calculate the center frequency for the control-path wideband filter
-        from the location on basilar membrane, based on Greenwood (JASA 1990) */
-
-    if (species == 1) /* for cat */
-    {
-        /* Cat frequency shift corresponding to 1.2 mm */
-        bmplace = 11.9 * log10(0.80 + cf / 456.0);                     /* Calculate the location on basilar membrane from CF */
-        centerfreq = 456.0 * (pow(10, (bmplace + 1.2) / 11.9) - 0.80); /* shift the center freq */
-    }
-
-    else /* for human */
-    {
-        /* Human frequency shift corresponding to 1.2 mm */
-        bmplace = (35 / 2.1) * log10(1.0 + cf / 165.4);                     /* Calculate the location on basilar membrane from CF */
-        centerfreq = 165.4 * (pow(10, (bmplace + 1.2) / (35 / 2.1)) - 1.0); /* shift the center freq */
-    }
-
-    /*==================================================================*/
-    /*====== Parameters for the gain ===========*/
-
-    if (species == 1)
-        gain = 52.0 / 2.0 * (tanh(2.2 * log10(cf / 0.6e3) + 0.15) + 1.0); /* for cat */
-    else
-        gain = 52.0 / 2.0 * (tanh(2.2 * log10(cf / 0.6e3) + 0.15) + 1.0); /* for human */
-    /*gain = 52/2*(tanh(2.2*log10(cf/1e3)+0.15)+1);*/
-    if (gain > 60.0)
-        gain = 60.0;
-    if (gain < 15.0)
-        gain = 15.0;
-
-    /*====== Parameters for the control-path wideband filter =======*/
-    bmorder = 3;
-    Get_tauwb(cf, species, bmorder, Taumax, Taumin);
-    taubm = cohc * (Taumax[0] - Taumin[0]) + Taumin[0];
-    ratiowb = Taumin[0] / Taumax[0];
-    /*====== Parameters for the signal-path C1 filter ======*/
-    Get_taubm(cf, species, Taumax[0], bmTaumax, bmTaumin, ratiobm);
-    bmTaubm = cohc * (bmTaumax[0] - bmTaumin[0]) + bmTaumin[0];
-    fcohc = bmTaumax[0] / bmTaubm;
-    /*====== Parameters for the control-path wideband filter =======*/
-    wborder = 3;
-    TauWBMax = Taumin[0] + 0.2 * (Taumax[0] - Taumin[0]);
-    TauWBMin = TauWBMax / Taumax[0] * Taumin[0];
-    tauwb = TauWBMax + (bmTaubm - bmTaumax[0]) * (TauWBMax - TauWBMin) / (bmTaumax[0] - bmTaumin[0]);
-
-    wbgain = gain_groupdelay(tdres, centerfreq, cf, tauwb, grdelay);
-    tmpgain[0] = wbgain;
-    lasttmpgain = wbgain;
-    /*===============================================================*/
-    /* Nonlinear asymmetry of OHC function and IHC C1 transduction function*/
-    ohcasym = 7.0;
-    ihcasym = 3.0;
-    /*===============================================================*/
-    /*===============================================================*/
-    /* Prewarping and related constants for the middle ear */
-    fp = 1e3; /* prewarping frequency 1 kHz */
-    C = TWOPI * fp / tan(TWOPI / 2 * fp * tdres);
-    if (species == 1) /* for cat */
-    {
-        /* Cat middle-ear filter - simplified version from Bruce et al. (JASA 2003) */
-        m11 = C / (C + 693.48);
-        m12 = (693.48 - C) / C;
-        m13 = 0.0;
-        m14 = 1.0;
-        m15 = -1.0;
-        m16 = 0.0;
-        m21 = 1 / (pow(C, 2) + 11053 * C + 1.163e8);
-        m22 = -2 * pow(C, 2) + 2.326e8;
-        m23 = pow(C, 2) - 11053 * C + 1.163e8;
-        m24 = pow(C, 2) + 1356.3 * C + 7.4417e8;
-        m25 = -2 * pow(C, 2) + 14.8834e8;
-        m26 = pow(C, 2) - 1356.3 * C + 7.4417e8;
-        m31 = 1 / (pow(C, 2) + 4620 * C + 909059944);
-        m32 = -2 * pow(C, 2) + 2 * 909059944;
-        m33 = pow(C, 2) - 4620 * C + 909059944;
-        m34 = 5.7585e5 * C + 7.1665e7;
-        m35 = 14.333e7;
-        m36 = 7.1665e7 - 5.7585e5 * C;
-        megainmax = 41.1405;
-    }
-    else /* for human */
-    {
-        /* Human middle-ear filter - based on Pascal et al. (JASA 1998)  */
-        m11 = 1 / (pow(C, 2) + 5.9761e+003 * C + 2.5255e+007);
-        m12 = (-2 * pow(C, 2) + 2 * 2.5255e+007);
-        m13 = (pow(C, 2) - 5.9761e+003 * C + 2.5255e+007);
-        m14 = (pow(C, 2) + 5.6665e+003 * C);
-        m15 = -2 * pow(C, 2);
-        m16 = (pow(C, 2) - 5.6665e+003 * C);
-        m21 = 1 / (pow(C, 2) + 6.4255e+003 * C + 1.3975e+008);
-        m22 = (-2 * pow(C, 2) + 2 * 1.3975e+008);
-        m23 = (pow(C, 2) - 6.4255e+003 * C + 1.3975e+008);
-        m24 = (pow(C, 2) + 5.8934e+003 * C + 1.7926e+008);
-        m25 = (-2 * pow(C, 2) + 2 * 1.7926e+008);
-        m26 = (pow(C, 2) - 5.8934e+003 * C + 1.7926e+008);
-        m31 = 1 / (pow(C, 2) + 2.4891e+004 * C + 1.2700e+009);
-        m32 = (-2 * pow(C, 2) + 2 * 1.2700e+009);
-        m33 = (pow(C, 2) - 2.4891e+004 * C + 1.2700e+009);
-        m34 = (3.1137e+003 * C + 6.9768e+008);
-        m35 = 2 * 6.9768e+008;
-        m36 = (-3.1137e+003 * C + 6.9768e+008);
-        megainmax = 2;
-    }
-    
-    for (n = 0; n < totalstim; n++) /* Start of the loop */
-    {
-        if (n == 0) /* Start of the middle-ear filtering section  */
-        {
-            mey1[0] = m11 * px[0];
-            if (species > 1)
-                mey1[0] = m11 * m14 * px[0];
-            mey2[0] = mey1[0] * m24 * m21;
-            mey3[0] = mey2[0] * m34 * m31;
-            meout = mey3[0] / megainmax;
-        }
-
-        else if (n == 1)
-        {
-            mey1[1] = m11 * (-m12 * mey1[0] + px[1] - px[0]);
-            if (species > 1)
-                mey1[1] = m11 * (-m12 * mey1[0] + m14 * px[1] + m15 * px[0]);
-            mey2[1] = m21 * (-m22 * mey2[0] + m24 * mey1[1] + m25 * mey1[0]);
-            mey3[1] = m31 * (-m32 * mey3[0] + m34 * mey2[1] + m35 * mey2[0]);
-            meout = mey3[1] / megainmax;
-        }
-        else
-        {
-            mey1[n] = m11 * (-m12 * mey1[n - 1] + px[n] - px[n - 1]);
-            if (species > 1)
-                mey1[n] = m11 * (-m12 * mey1[n - 1] - m13 * mey1[n - 2] + m14 * px[n] + m15 * px[n - 1] + m16 * px[n - 2]);
-            mey2[n] = m21 * (-m22 * mey2[n - 1] - m23 * mey2[n - 2] + m24 * mey1[n] + m25 * mey1[n - 1] + m26 * mey1[n - 2]);
-            mey3[n] = m31 * (-m32 * mey3[n - 1] - m33 * mey3[n - 2] + m34 * mey2[n] + m35 * mey2[n - 1] + m36 * mey2[n - 2]);
-            meout = mey3[n] / megainmax;
-        }; /* End of the middle-ear filtering section */
-
-        /* Control-path filter */
-        wbout1 = WbGammaTone(meout, tdres, centerfreq, n, tauwb, wbgain, wborder);
-        wbout = pow((tauwb / TauWBMax), wborder) * wbout1 * 10e3 * std::max(1., cf / 5e3);
-
-        ohcnonlinout = Boltzman(wbout, ohcasym, 12.0, 5.0, 5.0);  /* pass the control signal through OHC Nonlinear Function */
-        ohcout = OhcLowPass(ohcnonlinout, tdres, 600, n, 1.0, 2); /* lowpass filtering after the OHC nonlinearity */
-
-        tmptauc1 = NLafterohc(ohcout, bmTaumin[0], bmTaumax[0], ohcasym); /* nonlinear function after OHC low-pass filter */
-        tauc1 = cohc * (tmptauc1 - bmTaumin[0]) + bmTaumin[0];            /* time -constant for the signal-path C1 filter */
-        rsigma = 1 / tauc1 - 1 / bmTaumax[0];                             /* shift of the location of poles of the C1 filter from the initial positions */
-
-        if (1 / tauc1 < 0.0)
-            printf("The poles are in the right-half plane; system is unstable.\n");
-
-        tauwb = TauWBMax + (tauc1 - bmTaumax[0]) * (TauWBMax - TauWBMin) / (bmTaumax[0] - bmTaumin[0]);
-
-        wb_gain = gain_groupdelay(tdres, centerfreq, cf, tauwb, grdelay);
-
-        grd = grdelay[0];
-
-        if ((grd + n) < totalstim)
-            tmpgain[grd + n] = wb_gain;
-
-        if (tmpgain[n] == 0)
-            tmpgain[n] = lasttmpgain;
-
-        wbgain = tmpgain[n];
-        lasttmpgain = wbgain;
-
-        /*====== Signal-path C1 filter ======*/
-
-        c1filterouttmp = C1ChirpFilt(meout, tdres, cf, n, bmTaumax[0], rsigma); /* C1 filter output */
-
-        /*====== Parallel-path C2 filter ======*/
-
-        c2filterouttmp = C2ChirpFilt(meout, tdres, cf, n, bmTaumax[0], 1 / ratiobm[0]); /* parallel-filter output*/
-
-        /*=== Run the inner hair cell (IHC) section: NL function and then lowpass filtering ===*/
-
-        c1vihctmp = NLogarithm(cihc * c1filterouttmp, 0.1, ihcasym, cf);
-
-        c2vihctmp = -NLogarithm(c2filterouttmp * fabs(c2filterouttmp) * cf / 10 * cf / 2e3, 0.2, 1.0, cf); /* C2 transduction output */
-
-        ihcouttmp[n] = IhcLowPass(c1vihctmp + c2vihctmp, tdres, 3000, n, 1.0, 7);
-    }; /* End of the loop */
-
-    /* Stretched out the IHC output according to nrep (number of repetitions) */
-
-    for (i = 0; i < totalstim * nrep; i++)
-    {
-        ihcouttmp[i] = ihcouttmp[(int)(fmod(i, totalstim))];
-    };
-    /* Adjust total path delay to IHC output signal */
-    if (species == 1)
-        delay = delay_cat(cf);
-    else
-    {                          /*    delay      = delay_human(cf); */
-        delay = delay_cat(cf); /* signal delay changed back to cat function for version 5.2 */
-    }
-    delaypoint = std::max(0, (int)ceil(delay / tdres));
-
-    for (i = delaypoint; i < totalstim * nrep; i++)
-    {
-        ihcout[i] = ihcouttmp[i - delaypoint];
-    };
-
-    /* Freeing dynamic memory allocated earlier */
-
-    free(ihcouttmp);
-    free(mey1);
-    free(mey2);
-    free(mey3);
-    free(tmpgain);
-
-} /* End of the SingleAN function */
-/* -------------------------------------------------------------------------------------------- */
-/* -------------------------------------------------------------------------------------------- */
-/** Get TauMax, TauMin for the tuning filter. The TauMax is determined by the bandwidth/Q10
-    of the tuning filter at low level. The TauMin is determined by the gain change between high
-    and low level */
-
-double Get_tauwb(double cf, int species, int order, double* taumax, double* taumin)
-{
-    double Q10, bw, gain, ratio;
-
-    if (species == 1)
-        gain = 52.0 / 2.0 * (tanh(2.2 * log10(cf / 0.6e3) + 0.15) + 1.0); /* for cat */
-    else
-        gain = 52.0 / 2.0 * (tanh(2.2 * log10(cf / 0.6e3) + 0.15) + 1.0); /* for human */
-    /*gain = 52/2*(tanh(2.2*log10(cf/1e3)+0.15)+1);*/                     /* older values */
-
-    if (gain > 60.0)
-        gain = 60.0;
-    if (gain < 15.0)
-        gain = 15.0;
-
-    ratio = pow(10, (-gain / (20.0 * order))); /* ratio of TauMin/TauMax according to the gain, order */
-    if (species == 1)                          /* cat Q10 values */
-    {
-        Q10 = pow(10, 0.4708 * log10(cf / 1e3) + 0.4664);
-    }
-    else if (species == 2) /* human Q10 values from Shera et al. (PNAS 2002) */
-    {
-        Q10 = pow((cf / 1000), 0.3) * 12.7 * 0.505 + 0.2085;
-    }
-    else/* human Q10 values from Glasberg & Moore (Hear. Res. 1990) */
-    {
-        Q10 = cf / 24.7 / (4.37 * (cf / 1000) + 1) * 0.505 + 0.2085;
-    }
-    bw = cf / Q10;
-
-    taumax[0] = 2.0 / (TWOPI * bw);
-
-    taumin[0] = taumax[0] * ratio;
-
-    return 0;
-}
-/* -------------------------------------------------------------------------------------------- */
-double Get_taubm(double cf, int species, double taumax, double* bmTaumax, double* bmTaumin, double* ratio)
-{
-    double gain, factor, bwfactor;
-
-    if (species == 1)
-        gain = 52.0 / 2.0 * (tanh(2.2 * log10(cf / 0.6e3) + 0.15) + 1.0); /* for cat */
-    else
-        gain = 52.0 / 2.0 * (tanh(2.2 * log10(cf / 0.6e3) + 0.15) + 1.0); /* for human */
-    /*gain = 52/2*(tanh(2.2*log10(cf/1e3)+0.15)+1);*/                     /* older values */
-
-    if (gain > 60.0)
-        gain = 60.0;
-    if (gain < 15.0)
-        gain = 15.0;
-
-    bwfactor = 0.7;
-    factor = 2.5;
-
-    ratio[0] = pow(10, (-gain / (20.0 * factor)));
-
-    bmTaumax[0] = taumax / bwfactor;
-    bmTaumin[0] = bmTaumax[0] * ratio[0];
-    return 0;
-}
-/* -------------------------------------------------------------------------------------------- */
-/** Pass the signal through the signal-path C1 Tenth Order Nonlinear Chirp-Gammatone Filter */
-
-double C1ChirpFilt(double x, double tdres, double cf, int n, double taumax, double rsigma)
-{
-    static double C1gain_norm, C1initphase;
-    static double C1input[12][4], C1output[12][4];
-
-    double ipw, ipb, rpa, pzero, rzero;
-    double sigma0, fs_bilinear, CF, norm_gain, phase, c1filterout;
-    int i, r, order_of_pole, half_order_pole, order_of_zero;
-    double temp, dy, preal, pimg;
-
-    Complex p[11];
-
-    /* Defining initial locations of the poles and zeros */
-    /*======== setup the locations of poles and zeros =======*/
-    sigma0 = 1 / taumax;
-    ipw = 1.01 * cf * TWOPI - 50;
-    ipb = 0.2343 * TWOPI * cf - 1104;
-    rpa = pow(10, log10(cf) * 0.9 + 0.55) + 2000;
-    pzero = pow(10, log10(cf) * 0.7 + 1.6) + 500;
-
-    /*===============================================================*/
-
-    order_of_pole = 10;
-    half_order_pole = order_of_pole / 2;
-    order_of_zero = half_order_pole;
-
-    fs_bilinear = TWOPI * cf / tan(TWOPI * cf * tdres / 2);
-    rzero = -pzero;
-    CF = TWOPI * cf;
-    
-    if (n == 0)
-    {
-        p[1].real(-sigma0);
-        p[1].imag(ipw);
-
-        p[5].real(p[1].real() - rpa);
-        p[5].imag(p[1].imag() - ipb);
-
-        p[3].real((p[1].real() + p[5].real()) * 0.5);
-        p[3].imag((p[1].imag() + p[5].imag()) * 0.5);
-
-        p[2] = std::conj(p[1]);
-        p[4] = std::conj(p[3]);
-        p[6] = std::conj(p[5]);
-
-        p[7] = p[1];
-        p[8] = p[2];
-        p[9] = p[5];
-        p[10] = p[6];
-
-        C1initphase = 0.0;
-        for (i = 1; i <= half_order_pole; i++)
-        {
-            preal = p[i * 2 - 1].real();
-            pimg = p[i * 2 - 1].imag();
-            C1initphase = C1initphase + atan(CF / (-rzero)) - atan((CF - pimg) / (-preal)) - atan((CF + pimg) / (-preal));
-        };
-
-        /*===================== Initialize C1input & C1output =====================*/
-
-        for (i = 1; i <= (half_order_pole + 1); i++)
-        {
-            C1input[i][3] = 0;
-            C1input[i][2] = 0;
-            C1input[i][1] = 0;
-            C1output[i][3] = 0;
-            C1output[i][2] = 0;
-            C1output[i][1] = 0;
-        }
-
-        /*===================== normalize the gain =====================*/
-
-        C1gain_norm = 1.0;
-        for (r = 1; r <= order_of_pole; r++)
-            C1gain_norm = C1gain_norm * (pow((CF - p[r].imag()), 2) + p[r].real() * p[r].real());
-    };
-
-    norm_gain = sqrt(C1gain_norm) / pow(sqrt(CF * CF + rzero * rzero), order_of_zero);
-
-    p[1].real(-sigma0 - rsigma);
-
-    if (p[1].real() > 0.0)
-        printf("The system becomes unstable.\n");
-
-    p[1].imag(ipw);
-
-    p[5].real(p[1].real() - rpa);
-    p[5].imag(p[1].imag() - ipb);
-
-    p[3].real((p[1].real() + p[5].real()) * 0.5);
-    p[3].imag((p[1].imag() + p[5].imag()) * 0.5);
-
-    p[2] = std::conj(p[1]);
-    p[4] = std::conj(p[3]);
-    p[6] = std::conj(p[5]);
-
-    p[7] = p[1];
-    p[8] = p[2];
-    p[9] = p[5];
-    p[10] = p[6];
-
-    phase = 0.0;
-    for (i = 1; i <= half_order_pole; i++)
-    {
-        preal = p[i * 2 - 1].real();
-        pimg = p[i * 2 - 1].imag();
-        phase = phase - atan((CF - pimg) / (-preal)) - atan((CF + pimg) / (-preal));
-    };
-
-    rzero = -CF / tan((C1initphase - phase) / order_of_zero);
-
-    if (rzero > 0.0)
-        printf("The zeros are in the right-half plane.\n");
-
-    /*%==================================================  */
-    /*each loop below is for a pair of poles and one zero */
-    /*%      time loop begins here                         */
-    /*%==================================================  */
-
-    C1input[1][3] = C1input[1][2];
-    C1input[1][2] = C1input[1][1];
-    C1input[1][1] = x;
-
-    for (i = 1; i <= half_order_pole; i++)
-    {
-        preal = p[i * 2 - 1].real();
-        pimg = p[i * 2 - 1].imag();
-
-        temp = pow((fs_bilinear - preal), 2) + pow(pimg, 2);
-
-        /*dy = (input[i][1] + (1-(fs_bilinear+rzero)/(fs_bilinear-rzero))*input[i][2]
-                                 - (fs_bilinear+rzero)/(fs_bilinear-rzero)*input[i][3] );
-           dy = dy+2*output[i][1]*(fs_bilinear*fs_bilinear-preal*preal-pimg*pimg);
-
-           dy = dy-output[i][2]*((fs_bilinear+preal)*(fs_bilinear+preal)+pimg*pimg);*/
-
-        dy = C1input[i][1] * (fs_bilinear - rzero) - 2 * rzero * C1input[i][2] - (fs_bilinear + rzero) * C1input[i][3] + 2 * C1output[i][1] * (fs_bilinear * fs_bilinear - preal * preal - pimg * pimg) - C1output[i][2] * ((fs_bilinear + preal) * (fs_bilinear + preal) + pimg * pimg);
-
-        dy = dy / temp;
-
-        C1input[i + 1][3] = C1output[i][2];
-        C1input[i + 1][2] = C1output[i][1];
-        C1input[i + 1][1] = dy;
-
-        C1output[i][2] = C1output[i][1];
-        C1output[i][1] = dy;
-    }
-
-    dy = C1output[half_order_pole][1] * norm_gain; /* don't forget the gain term */
-    c1filterout = dy / 4.0;                        /* signal path output is divided by 4 to give correct C1 filter gain */
-
-    return (c1filterout);
-}
-
-/* -------------------------------------------------------------------------------------------- */
-/** Parallelpath C2 filter: same as the signal-path C1 filter with the OHC completely impaired */
-
-double C2ChirpFilt(double xx, double tdres, double cf, int n, double taumax, double fcohc)
-{
-    static double C2gain_norm, C2initphase;
-    static double C2input[12][4];
-    static double C2output[12][4];
-
-    double ipw, ipb, rpa, pzero, rzero;
-
-    double sigma0, fs_bilinear, CF, norm_gain, phase, c2filterout;
-    int i, r, order_of_pole, half_order_pole, order_of_zero;
-    double temp, dy, preal, pimg;
-
-    Complex p[11];
-
-    /*================ setup the locations of poles and zeros =======*/
-
-    sigma0 = 1 / taumax;
-    ipw = 1.01 * cf * TWOPI - 50;
-    ipb = 0.2343 * TWOPI * cf - 1104;
-    rpa = pow(10, log10(cf) * 0.9 + 0.55) + 2000;
-    pzero = pow(10, log10(cf) * 0.7 + 1.6) + 500;
-    /*===============================================================*/
-
-    order_of_pole = 10;
-    half_order_pole = order_of_pole / 2;
-    order_of_zero = half_order_pole;
-
-    fs_bilinear = TWOPI * cf / tan(TWOPI * cf * tdres / 2);
-    rzero = -pzero;
-    CF = TWOPI * cf;
-
-    if (n == 0)
-    {
-        p[1].real(-sigma0);
-        p[1].imag(ipw);
-
-        p[5].real(p[1].real() - rpa);
-        p[5].imag(p[1].imag() - ipb);
-
-        p[3].real((p[1].real() + p[5].real()) * 0.5);
-        p[3].imag((p[1].imag() + p[5].imag()) * 0.5);
-
-        p[2] = std::conj(p[1]);
-        p[4] = std::conj(p[3]);
-        p[6] = std::conj(p[5]);
-
-        p[7] = p[1];
-        p[8] = p[2];
-        p[9] = p[5];
-        p[10] = p[6];
-
-        C2initphase = 0.0;
-        for (i = 1; i <= half_order_pole; i++)
-        {
-            preal = p[i * 2 - 1].real();
-            pimg = p[i * 2 - 1].imag();
-            C2initphase = C2initphase + atan(CF / (-rzero)) - atan((CF - pimg) / (-preal)) - atan((CF + pimg) / (-preal));
-        };
-
-        /*===================== Initialize C2input & C2output =====================*/
-
-        for (i = 1; i <= (half_order_pole + 1); i++)
-        {
-            C2input[i][3] = 0;
-            C2input[i][2] = 0;
-            C2input[i][1] = 0;
-            C2output[i][3] = 0;
-            C2output[i][2] = 0;
-            C2output[i][1] = 0;
-        }
-
-        /*===================== normalize the gain =====================*/
-
-        C2gain_norm = 1.0;
-        for (r = 1; r <= order_of_pole; r++)
-            C2gain_norm = C2gain_norm * (pow((CF - p[r].imag()), 2) + p[r].real() * p[r].real());
-    };
-
-    norm_gain = sqrt(C2gain_norm) / pow(sqrt(CF * CF + rzero * rzero), order_of_zero);
-
-    p[1].real(-sigma0 * fcohc);
-
-    if (p[1].real() > 0.0)
-        printf("The system becomes unstable.\n");
-
-    p[1].imag(ipw);
-
-    p[5].real(p[1].real() - rpa);
-    p[5].imag(p[1].imag() - ipb);
-
-    p[3].real((p[1].real() + p[5].real()) * 0.5);
-    p[3].imag((p[1].imag() + p[5].imag()) * 0.5);
-
-    p[2] = std::conj(p[1]);
-    p[4] = std::conj(p[3]);
-    p[6] = std::conj(p[5]);
-
-    p[7] = p[1];
-    p[8] = p[2];
-    p[9] = p[5];
-    p[10] = p[6];
-
-    phase = 0.0;
-    for (i = 1; i <= half_order_pole; i++)
-    {
-        preal = p[i * 2 - 1].real();
-        pimg = p[i * 2 - 1].imag();
-        phase = phase - atan((CF - pimg) / (-preal)) - atan((CF + pimg) / (-preal));
-    };
-
-    rzero = -CF / tan((C2initphase - phase) / order_of_zero);
-    if (rzero > 0.0)
-        printf("The zeros are in the right-hand plane.\n");
-    /*%==================================================  */
-    /*%      time loop begins here                         */
-    /*%==================================================  */
-
-    C2input[1][3] = C2input[1][2];
-    C2input[1][2] = C2input[1][1];
-    C2input[1][1] = xx;
-
-    for (i = 1; i <= half_order_pole; i++)
-    {
-        preal = p[i * 2 - 1].real();
-        pimg = p[i * 2 - 1].imag();
-
-        temp = pow((fs_bilinear - preal), 2) + pow(pimg, 2);
-
-        /*dy = (input[i][1] + (1-(fs_bilinear+rzero)/(fs_bilinear-rzero))*input[i][2]
-                                 - (fs_bilinear+rzero)/(fs_bilinear-rzero)*input[i][3] );
-           dy = dy+2*output[i][1]*(fs_bilinear*fs_bilinear-preal*preal-pimg*pimg);
-
-           dy = dy-output[i][2]*((fs_bilinear+preal)*(fs_bilinear+preal)+pimg*pimg);*/
-
-        dy = C2input[i][1] * (fs_bilinear - rzero) - 2 * rzero * C2input[i][2] - (fs_bilinear + rzero) * C2input[i][3] + 2 * C2output[i][1] * (fs_bilinear * fs_bilinear - preal * preal - pimg * pimg) - C2output[i][2] * ((fs_bilinear + preal) * (fs_bilinear + preal) + pimg * pimg);
-
-        dy = dy / temp;
-
-        C2input[i + 1][3] = C2output[i][2];
-        C2input[i + 1][2] = C2output[i][1];
-        C2input[i + 1][1] = dy;
-
-        C2output[i][2] = C2output[i][1];
-        C2output[i][1] = dy;
-    };
-
-    dy = C2output[half_order_pole][1] * norm_gain;
-    c2filterout = dy / 4.0;
-
-    return (c2filterout);
-}
-
-/* -------------------------------------------------------------------------------------------- */
-/** Pass the signal through the Control path Third Order Nonlinear Gammatone Filter */
-
-double WbGammaTone(double x, double tdres, double centerfreq, int n, double tau, double gain, int order)
-{
-    static double wbphase;
-    static Complex wbgtf[4], wbgtfl[4];
-   
-    double delta_phase, dtmp, c1LP, c2LP, out;
-    int i, j;
-
-    if (n == 0)
-    {
-        wbphase = 0;
-        for (i = 0; i <= order; i++)
-        {
-            wbgtfl[i] = Complex(0.0); // compmult(0, compexp(0));
-            wbgtf[i] = Complex(0.0); //compmult(0, compexp(0));
-        }
-    }
-
-    delta_phase = -TWOPI * centerfreq * tdres;
-    wbphase += delta_phase;
-
-    dtmp = tau * 2.0 / tdres;
-    c1LP = (dtmp - 1) / (dtmp + 1);
-    c2LP = 1.0 / (dtmp + 1);
-    wbgtf[0] = Complex(cos(wbphase), sin(wbphase)) * x; /* FREQUENCY SHIFT */
-        
-
-    for (j = 1; j <= order; j++) /* IIR Bilinear transformation LPF */ 
-        wbgtf[j] = ((c2LP * gain) * (wbgtf[j - 1] + wbgtfl[j - 1])) + (c1LP * wbgtfl[j]);
-       
-
-    /*auto tmp = Complex(cos(-wbphase), sin(-wbphase));
-    
-    Complex(
-        (tmp.real() * wbgtf[order].real()) - (tmp.imag() * wbgtf[order].imag()),
-        (tmp.real() * wbgtf[order].imag()) + (tmp.imag() * wbgtf[order].real())
-    ).real()*/
-
-
-    /* FREQ SHIFT BACK UP */
-    out = (cos(-wbphase) * wbgtf[order].real()) - (sin(-wbphase) * wbgtf[order].imag());
-        
-    //REAL(compprod(compexp(-wbphase), wbgtf[order])); 
-
-    for (i = 0; i <= order; i++)
-        wbgtfl[i] = wbgtf[i];
-    return out;
-}
-
-/* -------------------------------------------------------------------------------------------- */
-/** Calculate the gain and group delay for the Control path Filter */
-
-double gain_groupdelay(double tdres, double centerfreq, double cf, double tau, int* grdelay)
-{
-    double tmpcos, dtmp2, c1LP, c2LP, tmp1, tmp2, wb_gain;
-
-    tmpcos = cos(TWOPI * (centerfreq - cf) * tdres);
-    dtmp2 = tau * 2.0 / tdres;
-    c1LP = (dtmp2 - 1) / (dtmp2 + 1);
-    c2LP = 1.0 / (dtmp2 + 1);
-    tmp1 = 1 + c1LP * c1LP - 2 * c1LP * tmpcos;
-    tmp2 = 2 * c2LP * c2LP * (1 + tmpcos);
-
-    wb_gain = pow(tmp1 / tmp2, 1.0 / 2.0);
-
-    grdelay[0] = (int)floor((0.5 - (c1LP * c1LP - c1LP * tmpcos) / (1 + c1LP * c1LP - 2 * c1LP * tmpcos)));
-
-    return (wb_gain);
-}
-/* -------------------------------------------------------------------------------------------- */
-/** Calculate the delay (basilar membrane, synapse, etc. for cat) */
-double delay_cat(double cf)
-{
-    double A0, A1, x, delay;
-
-    A0 = 3.0;
-    A1 = 12.5;
-    x = 11.9 * log10(0.80 + cf / 456.0); /* cat mapping */
-    delay = A0 * exp(-x / A1) * 1e-3;
-
-    return (delay);
-}
-
-/* Calculate the delay (basilar membrane, synapse, etc.) for human, based
-        on Harte et al. (JASA 2009) */
-double delay_human(double cf)
-{
-    double A, B, delay;
-
-    A = -0.37;
-    B = 11.09 / 2;
-    delay = B * pow(cf * 1e-3, A) * 1e-3;
-
-    return (delay);
-}
-
-/* -------------------------------------------------------------------------------------------- */
-/* Get the output of the OHC Nonlinear Function (Boltzman Function) */
-
-double Boltzman(double x, double asym, double s0, double s1, double x1)
-{
-    double shift, x0, out1, out;
-
-    shift = 1.0 / (1.0 + asym); /* asym is the ratio of positive Max to negative Max*/
-    x0 = s0 * log((1.0 / shift - 1) / (1 + exp(x1 / s1)));
-
-    out1 = 1.0 / (1.0 + exp(-(x - x0) / s0) * (1.0 + exp(-(x - x1) / s1))) - shift;
-    out = out1 / (1 - shift);
-
-    return (out);
-} /* output of the nonlinear function, the output is normalized with maximum value of 1 */
-
-/* -------------------------------------------------------------------------------------------- */
-/* Get the output of the OHC Low Pass Filter in the Control path */
-
-double OhcLowPass(double x, double tdres, double Fc, int n, double gain, int order)
-{
-    static double ohc[4], ohcl[4];
-
-    double c, c1LP, c2LP;
-    int i, j;
-
-    if (n == 0)
-    {
-        for (i = 0; i < (order + 1); i++)
-        {
-            ohc[i] = 0;
-            ohcl[i] = 0;
-        }
-    }
-
-    c = 2.0 / tdres;
-    c1LP = (c - TWOPI * Fc) / (c + TWOPI * Fc);
-    c2LP = TWOPI * Fc / (TWOPI * Fc + c);
-
-    ohc[0] = x * gain;
-    for (i = 0; i < order; i++)
-        ohc[i + 1] = c1LP * ohcl[i + 1] + c2LP * (ohc[i] + ohcl[i]);
-    for (j = 0; j <= order; j++)
-        ohcl[j] = ohc[j];
-    return (ohc[order]);
-}
-/* -------------------------------------------------------------------------------------------- */
-/* Get the output of the IHC Low Pass Filter  */
-
-double IhcLowPass(double x, double tdres, double Fc, int n, double gain, int order)
-{
-    static double ihc[8], ihcl[8];
-
-    double C, c1LP, c2LP;
-    int i, j;
-
-    if (n == 0)
-    {
-        for (i = 0; i < (order + 1); i++)
-        {
-            ihc[i] = 0;
-            ihcl[i] = 0;
-        }
-    }
-
-    C = 2.0 / tdres;
-    c1LP = (C - TWOPI * Fc) / (C + TWOPI * Fc);
-    c2LP = TWOPI * Fc / (TWOPI * Fc + C);
-
-    ihc[0] = x * gain;
-    for (i = 0; i < order; i++)
-        ihc[i + 1] = c1LP * ihcl[i + 1] + c2LP * (ihc[i] + ihcl[i]);
-    for (j = 0; j <= order; j++)
-        ihcl[j] = ihc[j];
-    return (ihc[order]);
-}
-/* -------------------------------------------------------------------------------------------- */
-/* Get the output of the Control path using Nonlinear Function after OHC */
-
-double NLafterohc(double x, double taumin, double taumax, double asym)
-{
-    double R, dc, R1, s0, x1, out, minR;
-
-    minR = 0.05;
-    R = taumin / taumax;
-
-    if (R < minR)
-        minR = 0.5 * R;
-    else
-        minR = minR;
-
-    dc = (asym - 1) / (asym + 1.0) / 2.0 - minR;
-    R1 = R - minR;
-
-    /* This is for new nonlinearity */
-    s0 = -dc / log(R1 / (1 - minR));
-
-    x1 = fabs(x);
-    out = taumax * (minR + (1.0 - minR) * exp(-x1 / s0));
-    if (out < taumin)
-        out = taumin;
-    if (out > taumax)
-        out = taumax;
-    return (out);
-}
-/* -------------------------------------------------------------------------------------------- */
-/* Get the output of the IHC Nonlinear Function (Logarithmic Transduction Functions) */
-
-double NLogarithm(double x, double slope, double asym, double cf)
-{
-    double corner, strength, xx, splx, asym_t;
-
-    corner = 80;
-    strength = 20.0e6 / pow(10, corner / 20);
-
-    xx = log(1.0 + strength * fabs(x)) * slope;
-
-    if (x < 0)
-    {
-        splx = 20 * log10(-x / 20e-6);
-        asym_t = asym - (asym - 1) / (1 + exp(splx / 5.0));
-        xx = -1 / asym_t * xx;
-    };
-    return (xx);
-}
-/* -------------------------------------------------------------------------------------------- */

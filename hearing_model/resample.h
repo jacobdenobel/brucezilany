@@ -39,13 +39,13 @@ using namespace std;
 #define M_PI 3.14159265358979323846
 #endif
 
-
 #include <stdexcept>
 #include <complex>
 #include <vector>
 #include <cmath>
 #include <numeric>
 #include <algorithm>
+#include <cmath>
 
 template <class S1, class S2, class C>
 class Resampler
@@ -55,170 +55,146 @@ public:
     typedef S2 outputType;
     typedef C coefType;
 
-    Resampler(int upRate, int downRate, C* coefs, int coefCount);
-    virtual ~Resampler();
+    Resampler(const int up_rate, const int down_rate, C* coefs, const int coef_count) : up_rate_(up_rate), down_rate_(down_rate), t_(0), x_offset_(0)
+        /*
+          The coefficients are copied into local storage in a transposed, flipped
+          arrangement.  For example, suppose upRate is 3, and the input number
+          of coefficients coefCount = 10, represented as h[0], ..., h[9].
+          Then the internal buffer will look like this:
+                h[9], h[6], h[3], h[0],   // flipped phase 0 coefs
+                   0, h[7], h[4], h[1],   // flipped phase 1 coefs (zero-padded)
+                   0, h[8], h[5], h[2],   // flipped phase 2 coefs (zero-padded)
+        */
+    {
+        padded_coef_count_ = coef_count;
+        while (padded_coef_count_ % up_rate_)
+        {
+            padded_coef_count_++;
+        }
+        coefs_per_phase_ = padded_coef_count_ / up_rate_;
 
-    int apply(S1* in, int inCount, S2* out, int outCount);
-    int neededOutCount(int inCount);
-    int coefsPerPhase() { return _coefsPerPhase; }
+        transposed_coefs_ = new coefType[padded_coef_count_];
+        fill(transposed_coefs_, transposed_coefs_ + padded_coef_count_, 0.);
+
+        state_ = new inputType[coefs_per_phase_ - 1];
+        state_end_ = state_ + coefs_per_phase_ - 1;
+        fill(state_, state_end_, 0.);
+
+        /* This both transposes, and "flips" each phase, while
+           * copying the defined coefficients into local storage.
+           * There is probably a faster way to do this
+           */
+        for (int i = 0; i < up_rate_; ++i)
+        {
+            for (int j = 0; j < coefs_per_phase_; ++j)
+            {
+                if (j * up_rate_ + i < coef_count)
+                    transposed_coefs_[(coefs_per_phase_ - 1 - j) + i * coefs_per_phase_] =
+                    coefs[j * up_rate_ + i];
+            }
+        }
+    }
+
+	virtual ~Resampler() {
+        delete[] transposed_coefs_;
+        delete[] state_;
+    }
+
+    int apply(S1* in, int in_count, S2* out, const int out_count) {
+        if (out_count < needed_out_count(in_count))
+            throw invalid_argument("Not enough output samples");
+
+        // x points to the latest processed input sample
+        inputType* x = in + x_offset_;
+        outputType* y = out;
+        inputType* end = in + in_count;
+        while (x < end)
+        {
+            outputType acc = 0.;
+            coefType* h = transposed_coefs_ + t_ * coefs_per_phase_;
+            inputType* x_ptr = x - coefs_per_phase_ + 1;
+            int offset = in - x_ptr;
+            if (offset > 0)
+            {
+                // need to draw from the _state buffer
+                inputType* state_ptr = state_end_ - offset;
+                while (state_ptr < state_end_)
+                {
+                    acc += *state_ptr++ * *h++;
+                }
+                x_ptr += offset;
+            }
+            while (x_ptr <= x)
+            {
+                acc += *x_ptr++ * *h++;
+            }
+            *y++ = acc;
+            t_ += down_rate_;
+
+            int advance_amount = t_ / up_rate_;
+
+            x += advance_amount;
+            // which phase of the filter to use
+            t_ %= up_rate_;
+        }
+        x_offset_ = x - end;
+
+        // manage _state buffer
+        // find number of samples retained in buffer:
+        int retain = (coefs_per_phase_ - 1) - in_count;
+        if (retain > 0)
+        {
+            // for inCount smaller than state buffer, copy end of buffer
+            // to beginning:
+            copy(state_end_ - retain, state_end_, state_);
+            // Then, copy the entire (short) input to end of buffer
+            copy(in, end, state_end_ - in_count);
+        }
+        else
+        {
+            // just copy last input samples into state buffer
+            copy(end - (coefs_per_phase_ - 1), end, state_);
+        }
+        // number of samples computed
+        return static_cast<int>(y - out);
+    }
+
+    [[nodiscard]] int needed_out_count(const int in_count) const
+	{
+		const int np = in_count * up_rate_;
+        int need = np / down_rate_;
+        if ((t_ + up_rate_ * x_offset_) < (np % down_rate_))
+            need++;
+        return need;
+    }
+
+    [[nodiscard]] int coefs_per_phase() const { return coefs_per_phase_; }
 
 private:
-    int _upRate;
-    int _downRate;
+    int up_rate_;
+    int down_rate_;
 
-    coefType* _transposedCoefs;
-    inputType* _state;
-    inputType* _stateEnd;
+    coefType* transposed_coefs_;
+    inputType* state_;
+    inputType* state_end_;
 
-    int _paddedCoefCount; // ceil(len(coefs)/upRate)*upRate
-    int _coefsPerPhase;   // _paddedCoefCount / upRate
+    int padded_coef_count_; // ceil(len(coefs)/upRate)*upRate
+    int coefs_per_phase_;   // _paddedCoefCount / upRate
 
-    int _t; // "time" (modulo upRate)
-    int _xOffset;
+    int t_; // "time" (modulo upRate)
+    int x_offset_;
 };
 
-#include <iostream>
-#include <cmath>
 
-/*
-using std::cout;
-using std::endl;
 
-using std::fill;
-using std::copy;
-*/
-
-using std::invalid_argument;
 
 template <class S1, class S2, class C>
-Resampler<S1, S2, C>::Resampler(int upRate, int downRate, C* coefs,
-    int coefCount) : _upRate(upRate), _downRate(downRate), _t(0), _xOffset(0)
-    /*
-      The coefficients are copied into local storage in a transposed, flipped
-      arrangement.  For example, suppose upRate is 3, and the input number
-      of coefficients coefCount = 10, represented as h[0], ..., h[9].
-      Then the internal buffer will look like this:
-            h[9], h[6], h[3], h[0],   // flipped phase 0 coefs
-               0, h[7], h[4], h[1],   // flipped phase 1 coefs (zero-padded)
-               0, h[8], h[5], h[2],   // flipped phase 2 coefs (zero-padded)
-    */
-{
-    _paddedCoefCount = coefCount;
-    while (_paddedCoefCount % _upRate)
-    {
-        _paddedCoefCount++;
-    }
-    _coefsPerPhase = _paddedCoefCount / _upRate;
-
-    _transposedCoefs = new coefType[_paddedCoefCount];
-    fill(_transposedCoefs, _transposedCoefs + _paddedCoefCount, 0.);
-
-    _state = new inputType[_coefsPerPhase - 1];
-    _stateEnd = _state + _coefsPerPhase - 1;
-    fill(_state, _stateEnd, 0.);
-
-    /* This both transposes, and "flips" each phase, while
-       * copying the defined coefficients into local storage.
-       * There is probably a faster way to do this
-       */
-    for (int i = 0; i < _upRate; ++i)
-    {
-        for (int j = 0; j < _coefsPerPhase; ++j)
-        {
-            if (j * _upRate + i < coefCount)
-                _transposedCoefs[(_coefsPerPhase - 1 - j) + i * _coefsPerPhase] =
-                coefs[j * _upRate + i];
-        }
-    }
-}
-
-template <class S1, class S2, class C>
-Resampler<S1, S2, C>::~Resampler()
-{
-    delete[] _transposedCoefs;
-    delete[] _state;
-}
-
-template <class S1, class S2, class C>
-int Resampler<S1, S2, C>::neededOutCount(int inCount)
-/* compute how many outputs will be generated for inCount inputs  */
-{
-    int np = inCount * _upRate;
-    int need = np / _downRate;
-    if ((_t + _upRate * _xOffset) < (np % _downRate))
-        need++;
-    return need;
-}
-
-template <class S1, class S2, class C>
-int Resampler<S1, S2, C>::apply(S1* in, int inCount,
-    S2* out, int outCount)
-{
-    if (outCount < neededOutCount(inCount))
-        throw invalid_argument("Not enough output samples");
-
-    // x points to the latest processed input sample
-    inputType* x = in + _xOffset;
-    outputType* y = out;
-    inputType* end = in + inCount;
-    while (x < end)
-    {
-        outputType acc = 0.;
-        coefType* h = _transposedCoefs + _t * _coefsPerPhase;
-        inputType* xPtr = x - _coefsPerPhase + 1;
-        int offset = in - xPtr;
-        if (offset > 0)
-        {
-            // need to draw from the _state buffer
-            inputType* statePtr = _stateEnd - offset;
-            while (statePtr < _stateEnd)
-            {
-                acc += *statePtr++ * *h++;
-            }
-            xPtr += offset;
-        }
-        while (xPtr <= x)
-        {
-            acc += *xPtr++ * *h++;
-        }
-        *y++ = acc;
-        _t += _downRate;
-
-        int advanceAmount = _t / _upRate;
-
-        x += advanceAmount;
-        // which phase of the filter to use
-        _t %= _upRate;
-    }
-    _xOffset = x - end;
-
-    // manage _state buffer
-    // find number of samples retained in buffer:
-    int retain = (_coefsPerPhase - 1) - inCount;
-    if (retain > 0)
-    {
-        // for inCount smaller than state buffer, copy end of buffer
-        // to beginning:
-        copy(_stateEnd - retain, _stateEnd, _state);
-        // Then, copy the entire (short) input to end of buffer
-        copy(in, end, _stateEnd - inCount);
-    }
-    else
-    {
-        // just copy last input samples into state buffer
-        copy(end - (_coefsPerPhase - 1), end, _state);
-    }
-    // number of samples computed
-    return (int)(y - out);
-}
-
-template <class S1, class S2, class C>
-void upfirdn(int upRate, int downRate,
-    S1* input, int inLength, C* filter, int filterLength,
+void upfirdn(int up_rate, int down_rate,
+    S1* input, const int in_length, C* filter, int filter_length,
     vector<S2>& results)
     /*
     This template function provides a one-shot resampling.  Extra samples
-    are padded to the end of the input in order to capture all of the non-zero
+    are padded to the end of the input in order to capture all the non-zero
     output samples.
     The output is in the "results" vector which is modified by the function.
 
@@ -232,33 +208,33 @@ void upfirdn(int upRate, int downRate,
     */
 {
     // Create the Resampler
-    Resampler<S1, S2, C> theResampler(upRate, downRate, filter, filterLength);
+    Resampler<S1, S2, C> the_resampler(up_rate, down_rate, filter, filter_length);
 
-    // pad input by length of one polyphase of filter to flush all values out
-    int padding = theResampler.coefsPerPhase() - 1;
-    S1* inputPadded = new S1[inLength + padding];
-    for (int i = 0; i < inLength + padding; i++)
+    // pad input by length of one poly phase of filter to flush all values out
+    const int padding = the_resampler.coefs_per_phase() - 1;
+    S1* input_padded = new S1[in_length + padding];
+    for (int i = 0; i < in_length + padding; i++)
     {
-        if (i < inLength)
-            inputPadded[i] = input[i];
+        if (i < in_length)
+            input_padded[i] = input[i];
         else
-            inputPadded[i] = 0;
+            input_padded[i] = 0;
     }
 
     // calc size of output
-    int resultsCount = theResampler.neededOutCount(inLength + padding);
+    int results_count = the_resampler.needed_out_count(in_length + padding);
 
-    results.resize(resultsCount);
+    results.resize(results_count);
 
     // run filtering
-    int numSamplesComputed = theResampler.apply(inputPadded,
-        inLength + padding, &results[0], resultsCount);
-    delete[] inputPadded;
+    the_resampler.apply(input_padded,
+                        in_length + padding, &results[0], results_count);
+    delete[] input_padded;
 }
 
 template <class S1, class S2, class C>
-void upfirdn(int upRate, int downRate,
-    vector<S1>& input, vector<C>& filter, vector<S2>& results)
+void upfirdn(const int up_rate, const int down_rate,
+             vector<S1>& input, vector<C>& filter, vector<S2>& results)
     /*
     This template function provides a one-shot resampling.
     The output is in the "results" vector which is modified by the function.
@@ -266,7 +242,7 @@ void upfirdn(int upRate, int downRate,
     pointer/count pairs.
     */
 {
-    upfirdn<S1, S2, C>(upRate, downRate, &input[0], input.size(), &filter[0],
+    upfirdn<S1, S2, C>(up_rate, down_rate, &input[0], input.size(), &filter[0],
         filter.size(), results);
 }
 
@@ -276,9 +252,9 @@ void upfirdn(int upRate, int downRate,
 //   OutputSignal is UpFactor/DownFactor times the length of InputSignal. UpFactor and DownFactor must be
 //   positive integers.
 
-//This function is translated from Matlab's Resample funtion.
+//This function is translated from Matlab's Resample function.
 
-//Author: Haoqi Bai
+// Author: Haoqi Bai
 
 template <typename T>
 T sinc(T x)
@@ -290,7 +266,7 @@ T sinc(T x)
     return std::sin(pix) / pix;
 }
 
-inline int quotientCeil(int num1, int num2)
+inline int quotient_ceil(const int num1, const int num2)
 {
     if (num1 % num2 != 0)
         return num1 / num2 + 1;
@@ -300,43 +276,43 @@ inline int quotientCeil(int num1, int num2)
 template <typename T>
 std::vector<T> firls(int length, std::vector<T> freq, const std::vector<T>& amplitude)
 {
-    int freqSize = freq.size();
-    int weightSize = freqSize / 2;
+	const int freq_size = freq.size();
+    int weight_size = freq_size / 2;
 
-    std::vector<T> weight(weightSize, 1.0);
+    std::vector<T> weight(weight_size, 1.0);
 
-    int filterLength = length + 1;
+	const int filter_length = length + 1;
 
     for (auto& it : freq)
         it /= 2.0;
 
-    length = (filterLength - 1) / 2;
-    bool Nodd = filterLength & 1;
+    length = (filter_length - 1) / 2;
+	const bool nodd = filter_length & 1;
     std::vector<T> k(length + 1);
     std::iota(k.begin(), k.end(), 0.0);
-    if (!Nodd)
+    if (!nodd)
         for (auto& it : k)
             it += 0.5;
 
     T b0 = 0.0;
-    if (Nodd)
+    if (nodd)
         k.erase(k.begin());
 
     std::vector<T> b(k.size(), 0.0);
-    for (int i = 0; i < freqSize; i += 2)
+    for (int i = 0; i < freq_size; i += 2)
     {
-        auto Fi = freq[i];
-        auto Fip1 = freq[i + 1];
+        auto fi = freq[i];
+        auto fip1 = freq[i + 1];
         auto ampi = amplitude[i];
         auto ampip1 = amplitude[i + 1];
         auto wt2 = std::pow(weight[i / 2], 2);
-        auto m_s = (ampip1 - ampi) / (Fip1 - Fi);
-        auto b1 = ampi - (m_s * Fi);
-        if (Nodd)
-            b0 += (b1 * (Fip1 - Fi)) + m_s / 2 * (std::pow(Fip1, 2) - std::pow(Fi, 2)) * wt2;
+        auto m_s = (ampip1 - ampi) / (fip1 - fi);
+        auto b1 = ampi - (m_s * fi);
+        if (nodd)
+            b0 += (b1 * (fip1 - fi)) + m_s / 2 * (std::pow(fip1, 2) - std::pow(fi, 2)) * wt2;
         
-        const auto cosfib1 = std::cos(2 * M_PI * Fip1);
-        const auto cosfi = std::cos(2 * M_PI * Fi);
+        const auto cosfib1 = std::cos(2 * M_PI * fip1);
+        const auto cosfi = std::cos(2 * M_PI * fi);
         const auto num = m_s / (4 * M_PI * M_PI) * (cosfib1 - cosfi);
 
         std::transform(b.begin(), b.end(), k.begin(), b.begin(),
@@ -344,13 +320,13 @@ std::vector<T> firls(int length, std::vector<T> freq, const std::vector<T>& ampl
 
 
         std::transform(b.begin(), b.end(), k.begin(), b.begin(),
-            [m_s, Fi, Fip1, wt2, b1](T b, T k)
-            { return b + (Fip1 * (m_s * Fip1 + b1) * sinc<T>(2 * k * Fip1) -
-                Fi * (m_s * Fi + b1) * sinc<T>(2 * k * Fi)) *
+            [m_s, fi, fip1, wt2, b1](T b, T k)
+            { return b + (fip1 * (m_s * fip1 + b1) * sinc<T>(2 * k * fip1) -
+                fi * (m_s * fi + b1) * sinc<T>(2 * k * fi)) *
             wt2; });
     }
 
-    if (Nodd)
+    if (nodd)
     {
         b.insert(b.begin(), b0);
     }
@@ -364,7 +340,7 @@ std::vector<T> firls(int length, std::vector<T> freq, const std::vector<T>& ampl
 
     std::vector<T> result = { a.rbegin(), a.rend() };
     decltype(a.begin()) it;
-    if (Nodd)
+    if (nodd)
     {
         it = a.begin() + 1;
     }
@@ -385,8 +361,8 @@ std::vector<T> firls(int length, std::vector<T> freq, const std::vector<T>& ampl
 template <typename T>
 std::vector<T> kaiser(const int order, const T bta)
 {
-    T Numerator, Denominator;
-    Denominator = std::cyl_bessel_i(0, bta);
+    T numerator, denominator;
+    denominator = std::cyl_bessel_i(0, bta);
     const auto od2 = (static_cast<T>(order) - 1) / 2;
     std::vector<T> window(order);
     for (int n = 0; n < order; n++)
@@ -394,72 +370,73 @@ std::vector<T> kaiser(const int order, const T bta)
         const auto nod = (n - od2) / od2;
         const auto nod2 = nod * nod;
         const auto x = bta * std::sqrt(1 - nod2);
-        Numerator = std::cyl_bessel_i(0, x);
-        window[n] = Numerator / Denominator;
+        numerator = std::cyl_bessel_i(0, x);
+        window[n] = numerator / denominator;
     }
     return window;
 }
 
 template <typename T>
-void resample(int upFactor, int downFactor,
-    std::vector<T>& inputSignal, std::vector<T>& outputSignal)
+void resample(int up_factor, int down_factor,
+    std::vector<T>& input_signal, std::vector<T>& output_signal)
 {
-    const int n = 10;
+	constexpr int n = 10;
     const T bta = 5.0;
-    if (upFactor <= 0 || downFactor <= 0)
+    if (up_factor <= 0 || down_factor <= 0)
         throw std::runtime_error("factors must be positive integer");
-    int gcd_o = std::gcd(upFactor, downFactor);
-    upFactor /= gcd_o;
-    downFactor /= gcd_o;
+    const int gcd_o = std::gcd(up_factor, down_factor);
+    up_factor /= gcd_o;
+    down_factor /= gcd_o;
 
-    if (upFactor == downFactor)
+    if (up_factor == down_factor)
     {
-        outputSignal = inputSignal;
+        output_signal = input_signal;
         return;
     }
 
-    int inputSize = inputSignal.size();
+	const int input_size = input_signal.size();
     
-    int outputSize = quotientCeil(inputSize * upFactor, downFactor);
+    int output_size = quotient_ceil(input_size * up_factor, down_factor);
 
 
-    int maxFactor = std::max(upFactor, downFactor);
-    T firlsFreq = 1.0 / 2.0 / static_cast<T>(maxFactor);
-    int length = 2 * n * maxFactor + 1;
-    std::vector<T> firlsFreqsV = { 0.0, 2 * firlsFreq, 2 * firlsFreq, 1.0 };
-    std::vector<T> firlsAmplitudeV = { 1.0, 1.0, 0.0, 0.0 };
-    std::vector<T> coefficients = firls<T>(length - 1, firlsFreqsV, firlsAmplitudeV);
+    int max_factor = std::max(up_factor, down_factor);
+    T firls_freq = 1.0 / 2.0 / static_cast<T>(max_factor);
+	const int length = 2 * n * max_factor + 1;
+    std::vector<T> firls_freqs_v = { 0.0, 2 * firls_freq, 2 * firls_freq, 1.0 };
+    std::vector<T> firls_amplitude_v = { 1.0, 1.0, 0.0, 0.0 };
+    std::vector<T> coefficients = firls<T>(length - 1, firls_freqs_v, firls_amplitude_v);
     std::vector<T> window = kaiser<T>(length, bta);
-    int coefficientsSize = coefficients.size();
-    for (int i = 0; i < coefficientsSize; i++)
-        coefficients[i] *= upFactor * window[i];
+	const int coefficients_size = coefficients.size();
+    for (int i = 0; i < coefficients_size; i++)
+        coefficients[i] *= up_factor * window[i];
 
-    int lengthHalf = (length - 1) / 2;
-    int nz = downFactor - lengthHalf % downFactor;
+    int length_half = (length - 1) / 2;
+    int nz = down_factor - length_half % down_factor;
     std::vector<T> h;
-    h.reserve(coefficientsSize + nz);
+    h.reserve(coefficients_size + nz);
     for (int i = 0; i < nz; i++)
         h.push_back(0.0);
-    for (int i = 0; i < coefficientsSize; i++)
+    for (int i = 0; i < coefficients_size; i++)
         h.push_back(coefficients[i]);
-    int hSize = h.size();
-    lengthHalf += nz;
-    int delay = lengthHalf / downFactor;
+
+	const int h_size = h.size();
+    length_half += nz;
+	const int delay = length_half / down_factor;
     nz = 0;
-    while (quotientCeil((inputSize - 1) * upFactor + hSize + nz, downFactor) - delay < outputSize)
+    while (quotient_ceil((input_size - 1) * up_factor + h_size + nz, down_factor) - delay < output_size)
         nz++;
     for (int i = 0; i < nz; i++)
         h.push_back(0.0);
 
     std::vector<T> y;
-    upfirdn(upFactor, downFactor, inputSignal, h, y);
+    upfirdn(up_factor, down_factor, input_signal, h, y);
 
     //outputSignal.clear();
-    outputSignal.resize(outputSize);
+    output_signal.resize(output_size);
 
-    for (int i = delay; i < outputSize + delay; i++) {
+    for (int i = delay; i < output_size + delay; i++) {
         //outputSignal.push_back(y[i]);
-        outputSignal[i - delay] = y[i];
+        output_signal[i - delay] = y[i];
     }
         
 }

@@ -111,7 +111,7 @@
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>C:\Program Files\MATLAB\R2021a\extern\lib\win64\microsoft</AdditionalLibraryDirectories>
-      <AdditionalDependencies>libMatlabEngine.lib;libMatlabDataArray.lib;$(CoreLibraryDependencies);%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>$(CoreLibraryDependencies);%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <ProjectReference>
       <UseLibraryDependencyInputs>true</UseLibraryDependencyInputs>
@@ -135,7 +135,7 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalLibraryDirectories>C:\Program Files\MATLAB\R2021a\extern\lib\win64\microsoft</AdditionalLibraryDirectories>
-      <AdditionalDependencies>libMatlabEngine.lib;libMatlabDataArray.lib;$(CoreLibraryDependencies);%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>%(CoreLibraryDependencies);%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <ProjectReference>
       <UseLibraryDependencyInputs>true</UseLibraryDependencyInputs>
@@ -144,7 +144,6 @@
   <ItemGroup>
     <ClCompile Include="fft.cpp" />
     <ClCompile Include="ihc.cpp" />
-    <ClCompile Include="interface.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="random.cpp" />
     <ClCompile Include="synapse.cpp" />

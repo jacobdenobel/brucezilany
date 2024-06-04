@@ -1,40 +1,43 @@
+#define _USE_MATH_DEFINES
+#include <cmath>
+
 #include <complex>
 #include <valarray>
 #include <iostream>
 
-const double PI = 3.141592653589793238460;
-
-typedef std::complex<double> Complex;
-typedef std::valarray<Complex> CArray;
-
-// Cooley-Tukey FFT (in-place, breadth-first, decimation-in-frequency)
-void fft(CArray& x)
+namespace utils
+{
+/**  Cooley-Tukey FFT (in-place, breadth-first, decimation-in-frequency)
+ * 
+ * @param x the signal
+ */
+void fft(std::valarray<std::complex<double>>& x)
 {
 	// DFT
-	size_t N = x.size(), k = N, n;
-	double thetaT = 3.14159265358979323846264338328L / N;
-	Complex phiT = Complex(cos(thetaT), -sin(thetaT)), T;
+	size_t k = x.size();
+	const double theta_t = M_PI / static_cast<double>(x.size());
+	auto phi_t = std::complex<double>(cos(theta_t), -sin(theta_t));
 	while (k > 1)
 	{
-		n = k;
+		const size_t n = k;
 		k >>= 1;
-		phiT = phiT * phiT;
-		T = 1.0L;
+		phi_t = phi_t * phi_t;
+		std::complex<double> T = 1.0L;
 		for (size_t l = 0; l < k; l++)
 		{
-			for (size_t a = l; a < N; a += n)
+			for (size_t a = l; a < x.size(); a += n)
 			{
-				size_t b = a + k;
-				Complex t = x[a] - x[b];
+				const size_t b = a + k;
+				std::complex<double> t = x[a] - x[b];
 				x[a] += x[b];
 				x[b] = t * T;
 			}
-			T *= phiT;
+			T *= phi_t;
 		}
 	}
 	// Decimate
-	size_t m = (size_t)log2(N);
-	for (size_t a = 0; a < N; a++)
+	const size_t m = static_cast<size_t>(log2(x.size()));
+	for (size_t a = 0; a < x.size(); a++)
 	{
 		size_t b = a;
 		// Reverse bits
@@ -45,7 +48,7 @@ void fft(CArray& x)
 		b = ((b >> 16) | (b << 16)) >> (32 - m);
 		if (b > a)
 		{
-			Complex t = x[a];
+			const std::complex<double> t = x[a];
 			x[a] = x[b];
 			x[b] = t;
 		}
@@ -53,7 +56,7 @@ void fft(CArray& x)
 }
 
 // inverse fft (in-place)
-void ifft(CArray& x)
+void ifft(std::valarray<std::complex<double>>& x)
 {
 	// conjugate the complex numbers
 	x = x.apply(std::conj);
@@ -66,4 +69,5 @@ void ifft(CArray& x)
 
 	// scale the numbers
 	x /= static_cast<double>(x.size());
+}
 }

@@ -1,17 +1,20 @@
 
+#include <cassert>
 #include <iostream>
 #include <fstream>
 #include <filesystem>
 
 #include <chrono>
 
+#include "bruce2018.h"
+
+
+#if test_matlab
 #include "MatlabEngine.hpp"
 #include "MatlabDataArray.hpp"
 
-#include "bruce2018.h"
-
-// ffGn, resample, randn, rand, sort
 bool test_random_fns(std::unique_ptr<matlab::engine::MATLABEngine>& matlabPtr, matlab::data::ArrayFactory& factory) {
+	// ffGn, resample, randn, rand, sort
 	std::vector<matlab::data::Array> args({
 		factory.createArray<double>({ 1, 1 }, { 1 }),
 		});
@@ -36,6 +39,26 @@ bool test_random_fns(std::unique_ptr<matlab::engine::MATLABEngine>& matlabPtr, m
 	return true;
 }
 
+std::vector<double> run_matlab_ffgn() {
+	std::unique_ptr<matlab::engine::MATLABEngine> matlabPtr = matlab::engine::startMATLAB();
+	matlab::data::ArrayFactory factory;
+
+	std::vector<matlab::data::Array> args({
+		factory.createScalar<double>(5300),
+		factory.createScalar<double>(1e-4),
+		factory.createScalar<double>(.9),
+		factory.createScalar<int>(0),
+		factory.createScalar<double>(100)
+		});
+	std::cout << "hallo\n";
+
+	matlab::data::TypedArray<double> result = matlabPtr->feval(u"ffGn", args);
+	std::vector<double> vResult(result.getNumberOfElements());
+	std::copy(result.begin(), result.end(), vResult.begin());
+	return vResult;
+}
+#endif
+
 void plot(
 	std::vector<std::vector<double>> vectors, 
 	const std::string& ptype = "line", 
@@ -45,13 +68,13 @@ void plot(
 	bool detach=true
 ) {
 
-	std::filesystem::path p = "C:\\Users\\Jacob\\source\\repos\\hearing_model";
+	std::filesystem::path p = "C:\\Users\\Jacob\\source\\repos\\jacobdenobel\\hearing_model";
 	const auto py = (p / "venv\\Scripts\\python.exe").generic_string();
 	const auto plot = (p / "plot.py").generic_string();
-	auto command = (detach ? "start " : "") + py + " " + plot + " " + ptype + " " + title + " " + xlabel + " " + ylabel;
+	auto command = (detach ? "start " : "") + "py "s + plot + " " + ptype + " " + title + " " + xlabel + " " + ylabel;
 	
 	for (auto i = 0; i < vectors.size(); i++) {
-		auto path = (std::filesystem::current_path() / (title + std::to_string(i)+ ".txt")).generic_string();
+		auto path = (title + std::to_string(i) + ".txt");
 		std::ofstream out;
 		out.open(path);
 
@@ -68,8 +91,8 @@ void plot(
 std::vector<double> ramped_sine_wave(const double period, const size_t n, double Fs, double rt, double ondelay, double F0, double stimdb) {
 	static double pi = 3.141592653589793;
 	// Generate stimulus
-	const size_t irpts = rt * Fs;
-	const size_t onbin = std::round(ondelay * Fs); // time of first stimulus
+	const size_t irpts = (size_t)rt * (size_t)Fs;
+	const size_t onbin = (size_t)std::round(ondelay * Fs); // time of first stimulus
 	std::vector<double> pin(onbin + n);
 
 	
@@ -151,57 +174,63 @@ std::vector<double> reduce_std(const std::vector<std::vector<double>>& x, const 
 void test_adaptive_redocking() {
 
 	// For adaptive redocking
+	static bool make_plots = false;
 	static double sampFreq = 10e3;
-	static int CF = 5e3;         // CF in Hz;
+	static int CF = (int)5e3;         // CF in Hz;
 	static int spont = 100;      // spontaneous firing rate
 	static double tabs = 0.6e-3; // Absolute refractory period
 	static double trel = 0.6e-3; // Baseline mean relative refractory period
 	static double cohc = 1.0;    // normal ohc function
 	static double cihc = 1.0;    // normal ihc function
 	static int species = 1;      // 1 for cat (2 for human with Shera et al. tuning; 3 for human with Glasberg & Moore tuning)
-	static int noiseType = 1;    // 1 for variable fGn; 0 for fixed (frozen) fGn
-	static int implnt = 0;       // "0" for approximate or "1" for actual implementation of the power-law functions in the Synapse
-	static int nrep = 1;         // number of stimulus repetitions
-	static int trials = 100;	     // number of trails 
+	static NoiseType noiseType = FIXED_MATLAB;    // 1 for variable fGn; 0 for fixed (frozen) fGn (this is different)
+	static int implnt = 1;       // "0" for approximate or "1" for actual implementation of the power-law functions in the Synapse (t his is reversed)
+	static int nrep = 2;         // number of stimulus repetitions
+	static int trials = 10;	 // number of trails 
 
 	// Stimulus parameters
 	static double stimdb = 60.0;                // stimulus intensity in dB SPL
 	static double F0 = static_cast<double>(CF); // stimulus frequency in Hz
-	static int Fs = 100e3;                      // sampling rate in Hz (must be 100, 200 or 500 kHz)
+	static int Fs = (int)100e3;                      // sampling rate in Hz (must be 100, 200 or 500 kHz)
 	static double T = 0.25;                     // stimulus duration in seconds
 	static double rt = 2.5e-3;                  // rise/fall time in seconds
 	static double ondelay = 25e-3;				// delay for the stim
 
 	const double interval = 1.0 / Fs;
-	const size_t mxpts = (T / interval) + 1;
+	const size_t mxpts = (size_t)(T / interval) + 1;
 	auto pin = ramped_sine_wave(interval, mxpts, Fs, rt, ondelay, F0, stimdb);
 	
 	auto start = std::chrono::high_resolution_clock::now();
 
 
-	auto ihc = inner_hair_cell(pin, CF, 1, interval, 2*T, 1, 1, CAT);
+	auto ihc = inner_hair_cell(pin, CF, nrep, interval, 2*T, 1, 1, CAT);
 	
 	const int totalstim = (int)(ihc.size() / nrep);
-	auto pla = map_to_power_law(ihc.data(), spont, CF, totalstim, nrep, sampFreq, interval);
+	
+	// This needs the new parameters
+	auto pla = map_to_power_law(ihc.data(), spont, CF, totalstim, nrep, sampFreq, interval, NONE);
 
 
 	double psthbinwidth = 5e-4;
-	size_t psthbins = round(psthbinwidth * Fs); // number of psth bins per psth bin
+	size_t psthbins = (size_t)round(psthbinwidth * Fs); // number of psth bins per psth bin
 	size_t n_bins = ihc.size() / psthbins;
 	size_t n_bins_eb = ihc.size() / 500;
 	std::vector<double> ptsh(n_bins, 0.0);
 
-	plot({ pin }, "line", "stimulus");
-	
+	if(make_plots)
+		plot({ pin }, "line", "stimulus");
+	 
 	std::vector<std::vector<double>> trd(n_bins_eb, std::vector<double>(trials));
 
-	std::vector<std::vector<double>> synout_vectors(50);
-	std::vector<std::vector<double>> trd_vectors(50, std::vector<double>(n_bins_eb));
-	std::vector<std::vector<double>> trel_vectors(50);
+
+	size_t nmax = 50;
+	std::vector<std::vector<double>> synout_vectors(nmax);
+	std::vector<std::vector<double>> trd_vectors(nmax, std::vector<double>(n_bins_eb));
+	std::vector<std::vector<double>> trel_vectors(nmax);
 	//std::cout << mean(pin) << std::endl;
 	for (auto i = 0; i < trials; i++) {
 		std::cout << i << "/" << trials << std::endl;
-		auto out = synapse(pla, CF, nrep, totalstim, interval, true, true, spont, tabs, trel);
+		auto out = synapse(pla, CF, nrep, totalstim, interval, noiseType, implnt, spont, tabs, trel);
 		auto binned = make_bins(out.psth, n_bins);
 		
 		scale(binned, 1.0/trials/psthbinwidth);
@@ -210,7 +239,7 @@ void test_adaptive_redocking() {
 		for (int j = 0; j < n_bins_eb; j++) 
 			trd[j][i] = out.mean_redocking_time[j * 500] *1e3;
 
-		if (i < 50) {
+		if (i < nmax) {
 			synout_vectors[i] = out.output_rate;
 			for (int j = 0; j < n_bins_eb; j++)
 				trd_vectors[i][j] = out.mean_redocking_time[j * 500] * 1e3;
@@ -218,32 +247,40 @@ void test_adaptive_redocking() {
 			trel_vectors[i] = out.mean_relative_refractory_period;
 			scale(trel_vectors[i], 1e3);
 		}
-		
 	}
 	auto stop = std::chrono::high_resolution_clock::now();
-	auto duration = std::chrono::duration_cast<std::chrono::seconds>(stop - start);
-	std::cout << "time elapsed: " << duration.count() << std::endl;
+	auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
+	std::cout << "time elapsed: " << 100.0 / duration.count() << " seconds" << std::endl;
 
 	
 	std::vector<double> t(n_bins);
 	for (size_t i = 0; i < n_bins; i++)
 		t[i] = i * psthbinwidth;
-	
-	plot({ ptsh, t }, "bar", "PTSH", "Time(s)", "FiringRate(s)");
-	std::cout <<"expected: 101.86, actual: " << mean(ptsh) << std::endl;
-	
-	
-	t.resize(n_bins_eb);
-	for (size_t i = 0; i < n_bins_eb; i++)
-		t[i] = i * interval;
 
-	auto m = reduce_mean(trd);
-	auto s = reduce_std(trd, m);
-	plot({ m, s, t}, "errorbar", "RedockingTime", "Time(s)", "t_{rd}(ms)");
-	
-	plot(synout_vectors, "line", "OutputRate", "x", "S_{out}");
-	plot(trd_vectors, "line", "RelDockTime", "x", "tau_{rd}");
-	plot(trel_vectors, "line", "RelRefr", "x", "t_{rel}");
+	std::cout <<"expected: 101.86, actual: " << mean(ptsh) << std::endl;
+	std::cout << ptsh[9] << std::endl;
+	std::cout << ptsh[16] << std::endl;
+	assert(abs(mean(ptsh) - 102.8) < 1e-8);
+	assert(ptsh[9] == 200.0);
+	assert(ptsh[16] == 200.0);
+
+	if (make_plots) {
+
+		plot({ ptsh, t }, "bar", "PTSH", "Time(s)", "FiringRate(s)");
+
+
+		t.resize(n_bins_eb);
+		for (size_t i = 0; i < n_bins_eb; i++)
+			t[i] = i * interval;
+
+		auto m = reduce_mean(trd);
+		auto s = reduce_std(trd, m);
+		plot({ m, s, t }, "errorbar", "RedockingTime", "Time(s)", "t_{rd}(ms)");
+
+		plot(synout_vectors, "line", "OutputRate", "x", "S_{out}");
+		plot(trd_vectors, "line", "RelDockTime", "x", "tau_{rd}");
+		plot(trel_vectors, "line", "RelRefr", "x", "t_{rel}");
+	}
 }
 
 template<typename T>
@@ -270,32 +307,43 @@ std::vector<double> read_file(const std::string& fname) {
 }
 
 
-std::vector<double> run_matlab_ffgn() {
-	std::unique_ptr<matlab::engine::MATLABEngine> matlabPtr = matlab::engine::startMATLAB();
-	matlab::data::ArrayFactory factory;
+struct Stimulus
+{
+	size_t frequency;
+	std::vector<double> data;
 
-	std::vector<matlab::data::Array> args({
-		factory.createScalar<double>(5300),
-		factory.createScalar<double>(1e-4),
-		factory.createScalar<double>(.9),
-		factory.createScalar<int>(0),
-		factory.createScalar<double>(100)
-		});
-	std::cout << "hallo\n";
+	Stimulus read(const std::string path)
+	{
 
-	matlab::data::TypedArray<double> result = matlabPtr->feval(u"ffGn", args);
-	std::vector<double> vResult(result.getNumberOfElements());
-	std::copy(result.begin(), result.end(), vResult.begin());
-	return vResult;
-}
+		//[stim, Fs_stim] = audioread('defineit.wav');
+		// stimdb = 65;% speech level in dB SPL
+		// stim = stim / rms(stim) * 20e-6 * 10 ^ (stimdb / 20);*/
+		Stimulus s;
+		s = normalize_db(s);
+		return s;
+	}
 
+	static Stimulus& normalize_db(Stimulus& stim)
+	{
+		const double stim_db = 65;
+
+		double rms_stim = 0.0;
+		for (const auto& xi : stim.data)
+			rms_stim += xi * xi;
+		rms_stim = std::sqrt(rms_stim / static_cast<double>(stim.data.size()));
+
+		for (auto& xi : stim.data)
+			xi = xi / rms_stim * 20e-6 * pow(10,  stim_db / 20);
+		return stim;
+	}
+};
+
+void example_neurogram()
+{
+	auto species = HUMAN_SHERA;
+
+}	
 
 int main() {
-	/*FFGN f;
-	auto vResult = f();
-	
-	plot({ cached_ffn(), vResult }, "line");
-
-	std::cout << vResult.size();*/
 	test_adaptive_redocking();
 }
