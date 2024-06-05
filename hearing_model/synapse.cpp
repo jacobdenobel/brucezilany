@@ -138,7 +138,7 @@ namespace syn
 			previous_release_times[i] = previous_release_times_bins[i] * time_resolution;
 
 
-		/* The position of first spike, also where the process is started- continued from the past */
+		/* The position of first spike, also where the process is started - continued from the past */
 		const int k_init = static_cast<int>(previous_release_times_bins[0]);
 
 		/* Current refractory time */
