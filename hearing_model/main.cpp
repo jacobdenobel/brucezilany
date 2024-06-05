@@ -184,7 +184,7 @@ void test_adaptive_redocking() {
 	static double cihc = 1.0;    // normal ihc function
 	static int species = 1;      // 1 for cat (2 for human with Shera et al. tuning; 3 for human with Glasberg & Moore tuning)
 	static NoiseType noiseType = FIXED_MATLAB;    // 1 for variable fGn; 0 for fixed (frozen) fGn (this is different)
-	static int implnt = 1;       // "0" for approximate or "1" for actual implementation of the power-law functions in the Synapse (t his is reversed)
+	static PowerLaw implnt = APPROXIMATED;       // "0" for approximate or "1" for actual implementation of the power-law functions in the synapse (t his is reversed)
 	static int nrep = 2;         // number of stimulus repetitions
 	static int trials = 10;	 // number of trails 
 
@@ -237,12 +237,12 @@ void test_adaptive_redocking() {
 		add(ptsh, binned);
 
 		for (int j = 0; j < n_bins_eb; j++) 
-			trd[j][i] = out.mean_redocking_time[j * 500] *1e3;
+			trd[j][i] = out.redocking_time[j * 500] *1e3;
 
 		if (i < nmax) {
-			synout_vectors[i] = out.output_rate;
+			synout_vectors[i] = out.synaptic_output;
 			for (int j = 0; j < n_bins_eb; j++)
-				trd_vectors[i][j] = out.mean_redocking_time[j * 500] * 1e3;
+				trd_vectors[i][j] = out.redocking_time[j * 500] * 1e3;
 
 			trel_vectors[i] = out.mean_relative_refractory_period;
 			scale(trel_vectors[i], 1e3);

@@ -7,6 +7,7 @@
 #include <ctime>
 #include <ciso646>
 #include <valarray>
+#include <array>
 #include <complex>
 #include <vector>
 #include <string>
@@ -39,6 +40,13 @@ enum NoiseType
 	FIXED_MATLAB = 1,
 	FIXED_SEED = 2,
 	RANDOM = 3
+};
+
+
+enum PowerLaw
+{
+	APPROXIMATED = 0,
+	ACTUAL = 1
 };
 
 namespace utils
@@ -77,40 +85,26 @@ namespace utils
 	std::vector<double> fast_fractional_gaussian_noise(
 		int n_out = 5300,
 		NoiseType noise = RANDOM,
-		int mu = 100
+		double mu = 100
 	);
 
+}
+
+ 
+namespace pla
+{
+	std::vector<double> power_law(const std::vector<double>& amplitude_ihc, const NoiseType noise, const double spontaneous_firing_rate,
+		const double sampling_frequency, const PowerLaw impl, const int n);
 }
 
 namespace ihc
 {
 
-	/* -------------------------------------------------------------------------------------------- */
-	/* -------------------------------------------------------------------------------------------- */
-	/** Get TauMax, TauMin for the tuning filter. The TauMax is determined by the bandwidth/Q10
-		of the tuning filter at low level. The TauMin is determined by the gain change between high
-		and low level
-	*/
-	//! Parameters for the control-path wideband filter
-	std::pair<double, double> get_tauwb(double cf, Species species, int order);
-
-	//!  Parameters for the signal-path C1 filter
-	std::tuple<double, double, double> get_taubm(double, double);
-
 	//! Pass the signal through the Control path Third Order Nonlinear Gammatone Filte
 	double wide_band_gamma_tone(double, double, double, int, double, double, int);
-
-	double C1ChirpFilt(double, double, double, int, double, double);
-	double C2ChirpFilt(double, double, double, int, double, double);
 	
-	double gain_groupdelay(double, double, double, double, int*);
 	double delay_cat(double cf);
 	double delay_human(double cf);
-	double OhcLowPass(double, double, double, int, double, int);
-	double IhcLowPass(double, double, double, int, double, int);
-	double Boltzman(double, double, double, double, double);
-	double NLafterohc(double, double, double, double);
-	double NLogarithm(double, double, double, double);
 
 	/*
 	 * @param px (pin) is the input sound wave in Pa sampled at the appropriate sampling rate (see instructions below)
@@ -125,8 +119,6 @@ namespace ihc
 	 *    or "3" for human BM tuning from Glasberg & Moore (Hear. Res. 1990)
 	 * @param ihcout
 	 */
-	void IHCAN(double* px, double cf, int nrep, double tdres, int totalstim,
-		double cohc, double cihc, Species species, double* ihcout);
 }
 
 
@@ -173,34 +165,58 @@ namespace syn
 	 * @param trd_vector vector of the mean redocking time in s for each time bin
 	 * @param trel_vector is a vector of the mean relative refractor period in s for each time bin
 	 */
-	void SingleAN(const std::vector<double>& sampIHC, double cf, int nrep, double tdres, int totalstim,
-	              NoiseType noiseType, int implnt, double spont, double tabs, double trel,
-	              double* meanrate, double* varrate, double* psth, double* synout, double* trd_vector,
-	              double* trel_vector);
 
-	double Synapse(const std::vector<double>&, double, double, int, int, double, NoiseType, int, double*);
 
-	int SpikeGenerator(double*, double, double, double, double, double, int, double, double,
-	                   double, int, int, double, std::vector<double>&, double*);
+	
 
 
 	//! Output wrapper for synapse
 	struct SynapseOutput
 	{
+		size_t n_rep;
+		size_t n_timesteps;
+		size_t n_total_timesteps;
+
 		std::vector<double> psth;
+		std::vector<double> synaptic_output; // synout
+		std::vector<double> redocking_time; // trd_vector
+
+		// No pre-alloc
+		std::vector<double> spike_times; 
 		std::vector<double> mean_firing_rate; // meanrate
 		std::vector<double> variance_firing_rate; // varrate
-		std::vector<double> output_rate; // synout
-		std::vector<double> mean_redocking_time; // trd_vector
 		std::vector<double> mean_relative_refractory_period; // trel_vector
 
-		SynapseOutput(const size_t n, const size_t n2) : psth(n), mean_firing_rate(n), variance_firing_rate(n),
-		                                                 output_rate(n2), mean_redocking_time(n2),
-		                                                 mean_relative_refractory_period(n2)
+		SynapseOutput(const size_t n_rep, const size_t n_timesteps) :
+			n_rep(n_rep),
+			n_timesteps(n_timesteps),
+			n_total_timesteps(n_rep * n_timesteps),
+			psth(n_timesteps),
+			synaptic_output(n_total_timesteps),
+			redocking_time(n_total_timesteps)
 		{
 		}
 	};
+
+	void synapse(const std::vector<double>&, double, double, double, NoiseType, PowerLaw, SynapseOutput&);
+
+	int SpikeGenerator(double*, double, double, double, double, double, int, double, double,
+		double, int, int, std::vector<double>&, double*);
 }
+
+
+namespace stats
+{
+	void calculate_refractory_and_redocking_stats(
+		syn::SynapseOutput& res,
+		size_t n_rep,
+		size_t n_sites,
+		int totalstim,
+		double absolute_refractory_period,
+		double relative_refractory_period
+	);
+}
+
 
 
 /**
@@ -252,10 +268,11 @@ syn::SynapseOutput synapse(
 	int totalstim,
 	double time_resolution = 1 / 100e3, // time_resolution in seconds, recprocal of sampling rate
 	NoiseType noise = RANDOM,
-	bool approximate = true, // implnttmp
+	PowerLaw approximate = APPROXIMATED, // implnttmp
 	double spont_rate = 100,
 	double abs_refractory_period = 0.7,
-	double rel_refractory_period = 0.6
+	double rel_refractory_period = 0.6,
+	bool calculate_stats = true
 );
 
 

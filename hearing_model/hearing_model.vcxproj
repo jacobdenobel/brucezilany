@@ -144,9 +144,13 @@
   <ItemGroup>
     <ClCompile Include="fft.cpp" />
     <ClCompile Include="ihc.cpp" />
+    <ClCompile Include="interface.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="power_law.cpp" />
     <ClCompile Include="random.cpp" />
+    <ClCompile Include="stats.cpp" />
     <ClCompile Include="synapse.cpp" />
+    <ClCompile Include="synapse_mapping.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="bruce2018.h" />

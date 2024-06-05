@@ -114,7 +114,7 @@ namespace utils
 		}
 	}
 
-	std::vector<double> fast_fractional_gaussian_noise(const int n_out, const NoiseType noise, const int mu)
+	std::vector<double> fast_fractional_gaussian_noise(const int n_out, const NoiseType noise, const double mu)
 	{
 		// TODO check if n_out can change
 		using namespace std::complex_literals;
