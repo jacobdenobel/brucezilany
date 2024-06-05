@@ -259,10 +259,10 @@ void test_adaptive_redocking() {
 
 	std::cout <<"expected: 101.86, actual: " << mean(ptsh) << std::endl;
 	std::cout << ptsh[9] << std::endl;
-	std::cout << ptsh[16] << std::endl;
-	assert(abs(mean(ptsh) - 102.8) < 1e-8);
+	std::cout << ptsh[15] << std::endl;
+	assert(abs(mean(ptsh) - 103.4) < 1e-8);
 	assert(ptsh[9] == 200.0);
-	assert(ptsh[16] == 200.0);
+	assert(ptsh[15] == 200.0);
 
 	if (make_plots) {
 

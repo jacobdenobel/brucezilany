@@ -166,10 +166,6 @@ namespace syn
 	 * @param trel_vector is a vector of the mean relative refractor period in s for each time bin
 	 */
 
-
-	
-
-
 	//! Output wrapper for synapse
 	struct SynapseOutput
 	{
@@ -200,8 +196,14 @@ namespace syn
 
 	void synapse(const std::vector<double>&, double, double, double, NoiseType, PowerLaw, SynapseOutput&);
 
-	int SpikeGenerator(double*, double, double, double, double, double, int, double, double,
-		double, int, int, std::vector<double>&, double*);
+	template<size_t nSites>
+	int spike_generator(
+		double time_resolution,
+		double spontaneous_firing_rate,
+		double abs_refractory_period,
+		double rel_refractory_period,
+		SynapseOutput& res
+	);
 }
 
 
@@ -269,7 +271,7 @@ syn::SynapseOutput synapse(
 	double time_resolution = 1 / 100e3, // time_resolution in seconds, recprocal of sampling rate
 	NoiseType noise = RANDOM,
 	PowerLaw approximate = APPROXIMATED, // implnttmp
-	double spont_rate = 100,
+	double spontaneous_firing_rate = 100,
 	double abs_refractory_period = 0.7,
 	double rel_refractory_period = 0.6,
 	bool calculate_stats = true

@@ -34,13 +34,13 @@ syn::SynapseOutput synapse(
 	const double time_resolution, // tdres
 	const NoiseType noise, // NoiseType
 	const PowerLaw approximate, // implnt
-	const double spont_rate, // spnt
+	const double spontaneous_firing_rate, // spnt
 	const double abs_refractory_period, // tabs
 	const double rel_refractory_period, // trel,
 	const bool calculate_stats
 )
 {
-	utils::validate_parameter(spont_rate, 1e-4, 180., "spont_rate");
+	utils::validate_parameter(spontaneous_firing_rate, 1e-4, 180., "spontaneous_firing_rate");
 	utils::validate_parameter(nrep, size_t{0}, std::numeric_limits<size_t>::max(), "nrep");
 	utils::validate_parameter(abs_refractory_period, 0., 20e-3, "abs_refractory_period");
 	utils::validate_parameter(rel_refractory_period, 0., 20e-3, "rel_refractory_period");
@@ -48,27 +48,20 @@ syn::SynapseOutput synapse(
 	auto res = syn::SynapseOutput(nrep, totalstim);
 
 	///*====== Run the synapse model ======*/
-	syn::synapse(sampIHC, time_resolution, cf, spont_rate, noise, approximate, res);
+	syn::synapse(sampIHC, time_resolution, cf, spontaneous_firing_rate, noise, approximate, res);
 
 
 	///*======  Synaptic Release/Spike Generation Parameters ======*/
-	const int n_sites = 4; /* Number of synpatic release sites */
-	constexpr double t_rd_rest = 14.0e-3; /* Resting value of the mean redocking time */
-	constexpr double t_rd_jump = 0.4e-3; /* Size of jump in mean redocking time when a redocking event occurs */
-	const double t_rd_init = t_rd_rest + 0.02e-3 * spont_rate - t_rd_jump; /* Initial value of the mean redocking time */
-	constexpr double tau = 60.0e-3; /* Time constant for short-term adaptation (in mean redocking time) */
-
-
-	const int n_spikes = syn::SpikeGenerator(res.synaptic_output.data(), time_resolution, t_rd_rest, t_rd_init, tau, t_rd_jump, n_sites,
-		abs_refractory_period, rel_refractory_period, spont_rate, totalstim, nrep, res.spike_times,
-		res.redocking_time.data());
+	constexpr int n_sites = 4; /* Number of synpatic release sites */
+	const int n_spikes = syn::spike_generator<n_sites>(time_resolution, spontaneous_firing_rate, abs_refractory_period, rel_refractory_period, res);
 
 	/* Generate PSTH */
 	for (int i = 0; i < n_spikes; i++)
 		res.psth[static_cast<int>(fmod(res.spike_times[i], time_resolution * totalstim) / time_resolution)]++;
 
 	if (calculate_stats)
-		stats::calculate_refractory_and_redocking_stats(res, nrep, n_sites, totalstim, abs_refractory_period, rel_refractory_period);
+		stats::calculate_refractory_and_redocking_stats(
+			res, nrep, n_sites, totalstim, abs_refractory_period, rel_refractory_period);
 
 	return res;
 }
@@ -107,75 +100,74 @@ namespace syn
 		}	
 	}
 
-	/* ------------------------------------------------------------------------------------ */
-	/* Pass the output of synapse model through the Spike Generator */
-	/* ------------------------------------------------------------------------------------ */
-	int SpikeGenerator(double* synout, double tdres, double t_rd_rest, double t_rd_init, double tau, double t_rd_jump,
-	                   int nSites, double tabs, double trel, double spont, int totalstim, int nrep,
-	                   std::vector<double>& spike_times, double* trd_vector)
+	template<size_t nSites>
+	int spike_generator(
+		const double time_resolution, 
+		const double spontaneous_firing_rate,
+		const double abs_refractory_period, 
+		const double rel_refractory_period, 
+		SynapseOutput& res
+	)
 	{
-		auto preRelease_initialGuessTimeBins = std::vector<double>(nSites);
-		auto elapsed_time = std::vector<double>(nSites);
-		auto previous_release_times = std::vector<double>(nSites);
-		auto current_release_times = std::vector<double>(nSites);
-		auto oneSiteRedock = std::vector<double>(nSites);
-		auto Xsum = std::vector<double>(nSites);
-		auto unitRateInterval = std::vector<double>(nSites);
+		constexpr double t_rd_rest = 14.0e-3; /* Resting value of the mean redocking time */
+		constexpr double t_rd_jump = 0.4e-3; /* Size of jump in mean redocking time when a redocking event occurs */
+		constexpr double tau = 60.0e-3; /* Time constant for short-term adaptation (in mean redocking time) */
+		const double t_rd_init = t_rd_rest + 0.02e-3 * spontaneous_firing_rate - t_rd_jump; /* Initial value of the mean redocking time */
 
-		/* Initial < redocking time associated to nSites release sites */
-		for (int i = 0; i < nSites; i++)
-			oneSiteRedock[i] = -t_rd_init * log(utils::rand1());
+		std::array<double, nSites> elapsed_time{};
+		std::array<double, nSites> previous_release_times{};
+		std::array<double, nSites> previous_release_times_bins{};
+		std::array<double, nSites> current_release_times{};
+		std::array<double, nSites> one_site_redocking{};
+		std::array<double, nSites> x_sum{};
+		std::array<double, nSites> unit_rate_interval{};
+			
 
-		/* Initial  preRelease_initialGuessTimeBins  associated to nsites release sites */
-		std::vector<double> preReleaseTimeBinsSorted(nSites);
-		for (int i = 0; i < nSites; i++)
+		/* Initial  preRelease_initialGuessTimeBins associated to nsites release sites */
+		for (size_t i = 0; i < nSites; i++)
 		{
-			preRelease_initialGuessTimeBins[i] = std::max(static_cast<double>(-totalstim * nrep),
-			                                              ceil((nSites / std::max(synout[0], 0.1) + t_rd_init) * log(
-				                                              utils::rand1()) / tdres));
-			preReleaseTimeBinsSorted[i] = preRelease_initialGuessTimeBins[i];
+			one_site_redocking[i] = -t_rd_init * log(utils::rand1());
+			previous_release_times_bins[i] = std::max(static_cast<double>(-static_cast<int>(res.n_total_timesteps)),
+				ceil((nSites / std::max(res.synaptic_output[0], 0.1) + t_rd_init) * log(utils::rand1()) / time_resolution));
 		}
 
-		// Now Sort the four initial preRelease times and associate
-		// the farthest to zero as the site which has also generated a spike 
-		std::sort(preReleaseTimeBinsSorted.begin(), preReleaseTimeBinsSorted.end());
+		std::sort(previous_release_times_bins.begin(), previous_release_times_bins.end());
 
-		/* Consider the inital previous_release_times to be  the preReleaseTimeBinsSorted *tdres */
-		for (int i = 0; i < nSites; i++)
-			previous_release_times[i] = preReleaseTimeBinsSorted[i] * tdres;
+		/* Consider the initial previous_release_times to be  the preReleaseTimeBinsSorted *time_resolution */
+		for (size_t i = 0; i < nSites; i++)
+			previous_release_times[i] = previous_release_times_bins[i] * time_resolution;
 
 
 		/* The position of first spike, also where the process is started- continued from the past */
-		int kInit = static_cast<int>(preReleaseTimeBinsSorted[0]);
+		const int k_init = static_cast<int>(previous_release_times_bins[0]);
 
 		/* Current refractory time */
-		double Tref = tabs - trel * log(utils::rand1());
+		double t_ref = abs_refractory_period - rel_refractory_period * log(utils::rand1());
 
-		/*initlal refractory regions */
-		double current_refractory_period = static_cast<double>(kInit) * tdres;
+		/*initial refractory regions */
+		double current_refractory_period = static_cast<double>(k_init) * time_resolution;
 
-		int spCount = 0; /* total numebr of spikes fired */
-		int k = kInit; /*the loop starts from kInit */
+		int spike_count = 0; 
 
 		/* set dynamic mean redocking time to initial mean redocking time  */
 		double previous_redocking_period = t_rd_init;
 		double current_redocking_period = previous_redocking_period;
 		int t_rd_decay = 1;
-		/* Logical "true" as to whether to decay the value of current_redocking_period at the end of the time step */
-		int rd_first = 0; /* Logical "false" as to whether to a first redocking event has occurred */
 
-		/* a loop to find the spike times for all the totalstim*nrep */
-		while (k < totalstim * nrep)
+		/* Logical "true" whether to decay the value of current_redocking_period at the end of the time step */
+		int rd_first = 0; /* Logical "false" whether to a first redocking event has occurred */
+
+		for (int k = k_init; k < static_cast<int>(res.n_total_timesteps); ++k)
 		{
-			for (int siteNo = 0; siteNo < nSites; siteNo++)
+			for (size_t site_no = 0; site_no < nSites; site_no++)
 			{
-				if (k > preReleaseTimeBinsSorted[siteNo])
+				if (k > previous_release_times_bins[site_no])
 				{
 					/* redocking times do not necessarily occur exactly at time step value - calculate the
 					 * number of integer steps for the elapsed time and redocking time */
-					const int oneSiteRedock_rounded = static_cast<int>(oneSiteRedock[siteNo] / tdres);
-					const int elapsed_time_rounded = static_cast<int>(elapsed_time[siteNo] / tdres);
-					if (oneSiteRedock_rounded == elapsed_time_rounded)
+					const int one_site_redocking_rounded = static_cast<int>(one_site_redocking[site_no] / time_resolution);
+					const int elapsed_time_rounded = static_cast<int>(elapsed_time[site_no] / time_resolution);
+					if (one_site_redocking_rounded == elapsed_time_rounded)
 					{
 						/* Jump  trd by t_rd_jump if a redocking event has occurred   */
 						current_redocking_period = previous_redocking_period + t_rd_jump;
@@ -185,59 +177,54 @@ namespace syn
 					}
 
 					/* to be sure that for each site , the code start from its
-					 * associated  previus release time :*/
-					elapsed_time[siteNo] = elapsed_time[siteNo] + tdres;
+					 * associated previous release time :*/
+					elapsed_time[site_no] = elapsed_time[site_no] + time_resolution;
 				}
 
 
-				/*the elapsed time passes  the one time redock (the redocking is finished),
+				/*the elapsed time passes  the one time redocking (the redocking is finished),
 				 * In this case the synaptic vesicle starts sensing the input
-				 * for each site integration starts after the redockinging is finished for the corresponding site)*/
-				if (elapsed_time[siteNo] >= oneSiteRedock[siteNo])
+				 * for each site integration starts after the redocking is finished for the corresponding site)*/
+				if (elapsed_time[site_no] >= one_site_redocking[site_no])
 				{
-					Xsum[siteNo] = Xsum[siteNo] + synout[std::max(0, k)] / nSites;
-					/* There are  nSites integrals each vesicle senses 1/nosites of  the whole rate */
+					x_sum[site_no] = x_sum[site_no] + res.synaptic_output[std::max(0, k)] / nSites;
+					/* There are  nSites integrals each vesicle senses 1/ nosites of  the whole rate */
 				}
 
-				if ((Xsum[siteNo] >= unitRateInterval[siteNo]) && (k >= preReleaseTimeBinsSorted[siteNo]))
+				if ((x_sum[site_no] >= unit_rate_interval[site_no]) && (k >= previous_release_times_bins[site_no]))
 				{
 					/* An event- a release  happened for the siteNo*/
 
-					oneSiteRedock[siteNo] = -current_redocking_period * log(utils::rand1());
-					current_release_times[siteNo] = previous_release_times[siteNo] + elapsed_time[siteNo];
-					elapsed_time[siteNo] = 0;
+					one_site_redocking[site_no] = -current_redocking_period * log(utils::rand1());
+					current_release_times[site_no] = previous_release_times[site_no] + elapsed_time[site_no];
+					elapsed_time[site_no] = 0;
 
-					if ((current_release_times[siteNo] >= current_refractory_period))
+					if ((current_release_times[site_no] >= current_refractory_period))
 					{
-						/* A spike occured for the current event- release
-						               * spike_times[(int)(current_release_times[siteNo]/tdres)-kInit+1 ] = 1;*/
-
-						/*Register only non negative spike times */
-						if (current_release_times[siteNo] >= 0)
+						if (current_release_times[site_no] >= 0)
 						{
-							spike_times.push_back(current_release_times[siteNo]);
-							//sptime[spCount] = ; 
-							spCount++;
+							res.spike_times.push_back(current_release_times[site_no]);
+							spike_count++;
 						}
 
-						double trel_k = std::min(trel * 100 / synout[std::max(0, k)], trel);
+						const double t_rel_k = std::min(rel_refractory_period * 100 / res.synaptic_output[std::max(0, k)], rel_refractory_period);
 
-						Tref = tabs - trel_k * log(utils::rand1()); /*Refractory periods */
+						t_ref = abs_refractory_period - t_rel_k * log(utils::rand1()); 
 
-						current_refractory_period = current_release_times[siteNo] + Tref;
+						current_refractory_period = current_release_times[site_no] + t_ref;
 					}
 
-					previous_release_times[siteNo] = current_release_times[siteNo];
+					previous_release_times[site_no] = current_release_times[site_no];
 
-					Xsum[siteNo] = 0;
-					unitRateInterval[siteNo] = static_cast<int>(-log(utils::rand1()) / tdres);
+					x_sum[site_no] = 0;
+					unit_rate_interval[site_no] = static_cast<int>(-log(utils::rand1()) / time_resolution);
 				}
 			}
 
-			/* Decay the adapative mean redocking time towards the resting value if no redocking events occurred in this time step */
+			/* Decay the adaptive mean redocking time towards the resting value if no redocking events occurred in this time step */
 			if ((t_rd_decay == 1) && (rd_first == 1))
 			{
-				current_redocking_period = previous_redocking_period - (tdres / tau) * (previous_redocking_period -
+				current_redocking_period = previous_redocking_period - (time_resolution / tau) * (previous_redocking_period -
 					t_rd_rest);
 				previous_redocking_period = current_redocking_period;
 			}
@@ -247,11 +234,8 @@ namespace syn
 			}
 
 			/* Store the value of the adaptive mean redocking time if it is within the simulation output period */
-			if ((k >= 0) && (k < totalstim * nrep))
-				trd_vector[k] = current_redocking_period;
-
-			k++;
+			res.redocking_time[std::max(k, 0)] = current_redocking_period;
 		}
-		return spCount;
+		return spike_count;
 	}
 }
