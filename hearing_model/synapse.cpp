@@ -301,7 +301,7 @@ syn::SynapseOutput synapse(
 
 	if (calculate_stats)
 		calculate_refractory_and_redocking_stats(
-			res, n_rep, n_sites, n_timesteps, abs_refractory_period, rel_refractory_period);
+			n_sites, abs_refractory_period, rel_refractory_period, res);
 
 	return res;
 }

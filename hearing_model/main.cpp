@@ -258,12 +258,11 @@ void test_adaptive_redocking() {
 		t[i] = i * psthbinwidth;
 
 	std::cout <<"expected: 101.86, actual: " << mean(ptsh) << std::endl;
-	std::cout << ptsh[9] << std::endl;
+	std::cout << ptsh[10] << std::endl;
 	std::cout << ptsh[15] << std::endl;
-	//assert(abs(mean(ptsh) - 103.4) < 1e-8);
-	assert(abs(mean(ptsh) - 101.2) < 1e-8);
-	assert(ptsh[9] == 200.0);
-	//assert(ptsh[15] == 200.0);
+	assert(abs(mean(ptsh) - 103.4) < 1e-8);
+	assert(ptsh[10] == 200.0);
+	assert(ptsh[15] == 200.0);
 
 	if (make_plots) {
 

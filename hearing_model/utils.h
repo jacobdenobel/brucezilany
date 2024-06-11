@@ -41,8 +41,17 @@ namespace utils
 	 */
 	void ifft(std::valarray<std::complex<double>>& x);
 
+	//! The random seed
+	extern int SEED;
+
 	//! The source of randomness
 	extern std::mt19937 GENERATOR;
+
+	/**
+	 * Set the global seed
+	 * @param seed the new value of the random seed 
+	 */
+	void set_seed(int seed);
 
 	/**
 	 * Generate a single uniform random number in [0, 1)

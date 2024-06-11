@@ -1,39 +1,8 @@
 #include "bruce2018.h"
 
-namespace utils
+namespace 
 {
-	std::mt19937 GENERATOR;
-
-	template <typename D>
-	std::vector<double> random(const size_t n, D& d)
-	{
-		std::vector<double> r(n);
-		for (auto& ri : r)
-			ri = d(GENERATOR);
-		return r;
-	}
-
-	double rand1()
-	{
-		static std::uniform_real_distribution<double> d(0, 1.0);
-		return d(GENERATOR);
-	}
-
-	std::vector<double> randn(const size_t n)
-	{
-		static std::normal_distribution<double> d(0, 1.0);
-		return random(n, d);
-	}
-
-	void fill_gaussian(std::vector<double>& x)
-	{
-		static std::normal_distribution<double> d(0, 1.0);
-		for (auto& xi : x)
-			xi = d(GENERATOR);
-	}
-
-
-	static std::vector<double> generate_zmag(const size_t n_samples)
+	std::vector<double> generate_zmag(const size_t n_samples)
 	{
 		static std::vector<double> z_mag;
 
@@ -47,15 +16,15 @@ namespace utils
 
 
 			std::generate(std::begin(fft_data), std::end(fft_data),
-			              [n_fft_half, n = 0, reverse = false]() mutable
-			              {
-				              if (n + 1 > n_fft_half) reverse = true;
-				              const double k = !reverse ? n++ : n--;
-				              return 0.5 * (pow(k + 1, 2. * 0.9) - (2.0 * pow(k, 2.0 * 0.9)) +
-					              pow(abs(k - 1), 2. * 0.9));
-			              });
+				[n_fft_half, n = 0, reverse = false]() mutable
+				{
+					if (n + 1 > n_fft_half) reverse = true;
+					const double k = !reverse ? n++ : n--;
+					return 0.5 * (pow(k + 1, 2. * 0.9) - (2.0 * pow(k, 2.0 * 0.9)) +
+						pow(abs(k - 1), 2. * 0.9));
+				});
 
-			fft(fft_data);
+			utils::fft(fft_data);
 			for (size_t i = 0; i < z_mag.size(); ++i)
 			{
 				if (fft_data[i].real() < 0.0)
@@ -68,7 +37,14 @@ namespace utils
 		return z_mag;
 	}
 
-	static void fill_noise_vectors(std::vector<double>& zr1, std::vector<double>& zr2, const NoiseType noise)
+	void fill_gaussian(std::vector<double>& x)
+	{
+		static std::normal_distribution<double> d(0, 1.0);
+		for (auto& xi : x)
+			xi = d(utils::GENERATOR);
+	}
+
+	void fill_noise_vectors(std::vector<double>& zr1, std::vector<double>& zr2, const NoiseType noise)
 	{
 		switch (noise)
 		{
@@ -99,12 +75,45 @@ namespace utils
 			};
 			break;
 		case FIXED_SEED:
-			GENERATOR.seed(42);
+			utils::GENERATOR.seed(42);
 			[[fallthrough]];
 		default:
 			fill_gaussian(zr1);
 			fill_gaussian(zr2);
 		}
+	}
+}
+
+namespace utils
+{
+	int SEED = 42;
+	std::mt19937 GENERATOR(SEED);
+
+	void set_seed(const int seed)
+	{
+		SEED = seed;
+		GENERATOR.seed(SEED);
+	}
+
+	template <typename D>
+	std::vector<double> random(const size_t n, D& d)
+	{
+		std::vector<double> r(n);
+		for (auto& ri : r)
+			ri = d(GENERATOR);
+		return r;
+	}
+
+	double rand1()
+	{
+		static std::uniform_real_distribution<double> d(0, 1.0);
+		return d(GENERATOR);
+	}
+
+	std::vector<double> randn(const size_t n)
+	{
+		static std::normal_distribution<double> d(0, 1.0);
+		return random(n, d);
 	}
 
 	std::vector<double> fast_fractional_gaussian_noise(const int n_out, const NoiseType noise, const double mu)
