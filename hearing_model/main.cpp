@@ -208,8 +208,7 @@ void test_adaptive_redocking() {
 	const int totalstim = (int)(ihc.size() / nrep);
 	
 	// This needs the new parameters
-	auto pla = map_to_synapse(ihc, spont, CF, totalstim, 
-	nrep, sampFreq, interval, SOFTPLUS);
+	auto pla = synapse_mapping::map(ihc, spont, CF,sampFreq, interval, SOFTPLUS);
 
 
 	double psthbinwidth = 5e-4;

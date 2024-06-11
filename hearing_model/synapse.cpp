@@ -25,54 +25,10 @@
 #include "bruce2018.h"
 
 
-syn::SynapseOutput synapse(
-	const std::vector<double>& amplitude_ihc, // resampled power law mapping of ihc output, see map_to_synapse
-	const double cf,
-	const int n_rep,
-	const int n_timesteps,
-	const double time_resolution, // tdres
-	const NoiseType noise, // NoiseType
-	const PowerLaw pla_impl, // implnt
-	const double spontaneous_firing_rate, // spnt
-	const double abs_refractory_period, // tabs
-	const double rel_refractory_period, // trel,
-	const bool calculate_stats
-)
-{
-	utils::validate_parameter(spontaneous_firing_rate, 1e-4, 180., "spontaneous_firing_rate");
-	utils::validate_parameter(n_rep, 0, std::numeric_limits<int>::max(), "n_rep");
-	utils::validate_parameter(abs_refractory_period, 0., 20e-3, "abs_refractory_period");
-	utils::validate_parameter(rel_refractory_period, 0., 20e-3, "rel_refractory_period");
-
-	auto res = syn::SynapseOutput(n_rep, n_timesteps);
-
-	///*====== Run the synapse model ======*/
-	constexpr double sampling_frequency = 10e3 /* Sampling frequency used in the synapse */;
-	const int delay_point = static_cast<int>(floor(7500 / (cf / 1e3)));
-
-
-	const auto pla_out = pla::power_law(amplitude_ihc, noise, pla_impl, spontaneous_firing_rate, sampling_frequency,
-	                                    delay_point, time_resolution, res.n_total_timesteps);
-
-	up_sample_synaptic_output(pla_out, time_resolution, sampling_frequency, delay_point, res);
-
-
-	///*======  Synaptic Release/Spike Generation Parameters ======*/
-	constexpr int n_sites = 4; /* Number of synaptic release sites */
-	const int n_spikes = syn::spike_generator<n_sites>(time_resolution, spontaneous_firing_rate, abs_refractory_period,
-	                                                   rel_refractory_period, res);
-
-	if (calculate_stats)
-		stats::calculate_refractory_and_redocking_stats(
-			res, n_rep, n_sites, n_timesteps, abs_refractory_period, rel_refractory_period);
-
-	return res;
-}
-
 namespace syn
 {
 	void up_sample_synaptic_output(const std::vector<double>& pla_out, const double time_resolution,
-	                               const double sampling_frequency, const int delay_point, SynapseOutput& res)
+		const double sampling_frequency, const int delay_point, SynapseOutput& res)
 	{
 		const int resampling_size = static_cast<int>(ceil(1 / (time_resolution * sampling_frequency)));
 		/*---------------------------------------------------------*/
@@ -120,8 +76,8 @@ namespace syn
 		{
 			one_site_redocking[i] = -t_rd_init * log(utils::rand1());
 			previous_release_times_bins[i] = std::max(static_cast<double>(-res.n_total_timesteps),
-			                                          ceil((nSites / std::max(res.synaptic_output[0], 0.1) + t_rd_init)
-				                                          * log(utils::rand1()) / time_resolution));
+				ceil((nSites / std::max(res.synaptic_output[0], 0.1) + t_rd_init)
+					* log(utils::rand1()) / time_resolution));
 		}
 
 		std::sort(previous_release_times_bins.begin(), previous_release_times_bins.end());
@@ -238,4 +194,114 @@ namespace syn
 		}
 		return spike_count;
 	}
+
+	double instantaneous_variance(const double synaptic_output, const double redocking_time, const double absolute_refractory_period, const double relative_refractory_period)
+	{
+		const double s2 = synaptic_output * synaptic_output;
+		const double s3 = s2 * synaptic_output;
+		const double s4 = s3 * synaptic_output;
+		const double s5 = s4 * synaptic_output;
+		const double s6 = s5 * synaptic_output;
+		const double s7 = s6 * synaptic_output;
+		const double s8 = s7 * synaptic_output;
+		const double trel2 = relative_refractory_period * relative_refractory_period;
+		const double t2 = redocking_time * redocking_time;
+		const double t3 = t2 * redocking_time;
+		const double t4 = t3 * redocking_time;
+		const double t5 = t4 * redocking_time;
+		const double t6 = t5 * redocking_time;
+		const double t7 = t6 * redocking_time;
+		const double t8 = t7 * redocking_time;
+		const double st = (synaptic_output * redocking_time + 4);
+		const double st4 = st * st * st * st;
+		const double ttts = redocking_time / 4 + absolute_refractory_period + relative_refractory_period + 1 / synaptic_output;
+		const double ttts3 = ttts * ttts * ttts;
+
+		const double numerator = (11 * s7 * t7) / 2 + (3 * s8 * t8) / 16 + 12288 * s2
+			* trel2 + redocking_time * (22528 * s3 * trel2 + 22528 * synaptic_output)
+			+ t6 * (3 * s8 * trel2 + 82 * s6) + t5 * (88 * s7 * trel2 + 664 * s5) + t4
+			* (976 * s6 * trel2 + 3392 * s4) + t3 * (5376 * s5 * trel2 + 10624 * s3)
+			+ t2 * (15616 * s4 * trel2 + 20992 * s2) + 12288;
+		const double denominator = s2 * st4 * (3 * s2 * t2 + 40 * synaptic_output * redocking_time + 48) * ttts3;
+		return numerator / denominator;
+	}
+
+
+	void calculate_refractory_and_redocking_stats(
+		const int n_sites,
+		const double abs_refractory_period,
+		const double rel_refractory_period,
+		SynapseOutput& res
+	)
+	{
+
+		res.mean_relative_refractory_period.resize(res.n_total_timesteps);
+		res.mean_firing_rate.resize(res.n_total_timesteps);
+		res.variance_firing_rate.resize(res.n_total_timesteps);
+
+
+		for (int i = 0; i < res.n_total_timesteps; i++)
+		{
+			const int i_pst = static_cast<int>(fmod(i, res.n_timesteps));
+			if (res.synaptic_output[i] > 0)
+			{
+				res.mean_relative_refractory_period[i] = std::min(rel_refractory_period * 100 / res.synaptic_output[i],
+					rel_refractory_period);
+				/* estimated instantaneous mean rate */
+				res.mean_firing_rate[i_pst] += res.synaptic_output[i] / (res.synaptic_output[i] * (abs_refractory_period + res.
+					redocking_time[i] / n_sites + res.mean_relative_refractory_period[i]) + 1) / res.n_rep;
+
+				res.variance_firing_rate[i_pst] += instantaneous_variance(res.synaptic_output[i], res.redocking_time[i],
+					abs_refractory_period,
+					res.mean_relative_refractory_period[i]) / res.n_rep;
+			}
+			else
+				res.mean_relative_refractory_period[i] = rel_refractory_period;
+		}
+	}
+}
+
+
+syn::SynapseOutput synapse(
+	const std::vector<double>& amplitude_ihc, // resampled power law mapping of ihc output, see map_to_synapse
+	const double cf,
+	const int n_rep,
+	const int n_timesteps,
+	const double time_resolution, // tdres
+	const NoiseType noise, // NoiseType
+	const PowerLaw pla_impl, // implnt
+	const double spontaneous_firing_rate, // spnt
+	const double abs_refractory_period, // tabs
+	const double rel_refractory_period, // trel,
+	const bool calculate_stats
+)
+{
+	utils::validate_parameter(spontaneous_firing_rate, 1e-4, 180., "spontaneous_firing_rate");
+	utils::validate_parameter(n_rep, 0, std::numeric_limits<int>::max(), "n_rep");
+	utils::validate_parameter(abs_refractory_period, 0., 20e-3, "abs_refractory_period");
+	utils::validate_parameter(rel_refractory_period, 0., 20e-3, "rel_refractory_period");
+
+	auto res = syn::SynapseOutput(n_rep, n_timesteps);
+
+	///*====== Run the synapse model ======*/
+	constexpr double sampling_frequency = 10e3 /* Sampling frequency used in the synapse */;
+	const int delay_point = static_cast<int>(floor(7500 / (cf / 1e3)));
+
+
+	const auto pla_out = pla::power_law(amplitude_ihc, noise, pla_impl, spontaneous_firing_rate, sampling_frequency,
+	                                    delay_point, time_resolution, res.n_total_timesteps);
+
+	up_sample_synaptic_output(pla_out, time_resolution, sampling_frequency, delay_point, res);
+
+
+	///*======  Synaptic Release/Spike Generation Parameters ======*/
+	constexpr int n_sites = 4; /* Number of synaptic release sites */
+	const int n_spikes = syn::spike_generator<n_sites>(time_resolution, spontaneous_firing_rate, abs_refractory_period,
+	                                                   rel_refractory_period, res);
+
+	if (calculate_stats)
+		calculate_refractory_and_redocking_stats(
+			res, n_rep, n_sites, n_timesteps, abs_refractory_period, rel_refractory_period);
+
+	return res;
 }

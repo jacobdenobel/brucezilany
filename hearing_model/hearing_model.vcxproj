@@ -142,19 +142,23 @@
     </ProjectReference>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="fft.cpp" />
-    <ClCompile Include="ihc.cpp" />
+    <ClCompile Include="inner_hair_cell.cpp" />
     <ClCompile Include="interface.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="power_law.cpp" />
-    <ClCompile Include="random.cpp" />
-    <ClCompile Include="stats.cpp" />
+    <ClCompile Include="utils.cpp" />
     <ClCompile Include="synapse.cpp" />
     <ClCompile Include="synapse_mapping.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="bruce2018.h" />
+    <ClInclude Include="inner_hair_cell.h" />
+    <ClInclude Include="power_law.h" />
     <ClInclude Include="resample.h" />
+    <ClInclude Include="synapse.h" />
+    <ClInclude Include="synapse_mapping.h" />
+    <ClInclude Include="types.h" />
+    <ClInclude Include="utils.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

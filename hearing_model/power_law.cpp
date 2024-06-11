@@ -2,8 +2,14 @@
 
 namespace pla
 {
-	void approximate(const std::vector<double>& amplitude_ihc, const std::vector<double>& random_numbers, const int n,
-		const double alpha1, const double alpha2, std::vector<double>& synapse_out)
+	void approximate(
+		const std::vector<double>& amplitude_ihc, 
+		const std::vector<double>& random_numbers, 
+		const int n,
+		const double alpha1, 
+		const double alpha2, 
+		std::vector<double>& synapse_out
+	)
 	{
 		std::array<double, 3> s1{ amplitude_ihc[0] + random_numbers[0] };
 		std::array<double, 3> s2{ amplitude_ihc[0] };
@@ -57,8 +63,13 @@ namespace pla
 	}
 
 	void actual(
-		const std::vector<double>& amplitude_ihc, const std::vector<double>& random_numbers,
-		const int n, const double alpha1, const double alpha2, const double beta1, const double beta2,
+		const std::vector<double>& amplitude_ihc, 
+		const std::vector<double>& random_numbers,
+		const int n, 
+		const double alpha1, 
+		const double alpha2, 
+		const double beta1, 
+		const double beta2,
 		const double bin_width,
 		std::vector<double>& synapse_out
 	)
