@@ -93,18 +93,24 @@ namespace utils
  
 namespace pla
 {
-	std::vector<double> power_law(const std::vector<double>& amplitude_ihc, const NoiseType noise, const double spontaneous_firing_rate,
-		const double sampling_frequency, const PowerLaw impl, const int n);
+	std::vector<double> power_law(
+		const std::vector<double>& amplitude_ihc, 
+		NoiseType noise, 
+		PowerLaw impl, 
+		double spontaneous_firing_rate,
+		double sampling_frequency, 
+		double delay_point,
+		double time_resolution,
+		int n_total_timesteps
+	);
 }
+
 
 namespace ihc
 {
 
 	//! Pass the signal through the Control path Third Order Nonlinear Gammatone Filte
-	double wide_band_gamma_tone(double, double, double, int, double, double, int);
-	
 	double delay_cat(double cf);
-	double delay_human(double cf);
 
 	/*
 	 * @param px (pin) is the input sound wave in Pa sampled at the appropriate sampling rate (see instructions below)
@@ -119,6 +125,7 @@ namespace ihc
 	 *    or "3" for human BM tuning from Glasberg & Moore (Hear. Res. 1990)
 	 * @param ihcout
 	 */
+
 }
 
 
@@ -169,9 +176,9 @@ namespace syn
 	//! Output wrapper for synapse
 	struct SynapseOutput
 	{
-		size_t n_rep;
-		size_t n_timesteps;
-		size_t n_total_timesteps;
+		int n_rep;
+		int n_timesteps;
+		int n_total_timesteps;
 
 		std::vector<double> psth;
 		std::vector<double> synaptic_output; // synout
@@ -183,7 +190,7 @@ namespace syn
 		std::vector<double> variance_firing_rate; // varrate
 		std::vector<double> mean_relative_refractory_period; // trel_vector
 
-		SynapseOutput(const size_t n_rep, const size_t n_timesteps) :
+		SynapseOutput(const int n_rep, const int n_timesteps) :
 			n_rep(n_rep),
 			n_timesteps(n_timesteps),
 			n_total_timesteps(n_rep * n_timesteps),
@@ -194,7 +201,7 @@ namespace syn
 		}
 	};
 
-	void synapse(const std::vector<double>&, double, double, double, NoiseType, PowerLaw, SynapseOutput&);
+	void up_sample_synaptic_output(const std::vector<double>& pla_out, double time_resolution, double sampling_frequency, int delay_point, SynapseOutput& res);
 
 	template<size_t nSites>
 	int spike_generator(
@@ -224,7 +231,7 @@ namespace stats
 /**
  * @brief model_IHC_BEZ2018 - Bruce, Erfani & Zilany (2018) Auditory Nerve Model
  *
- *     vihc = model_IHC_BEZ2018(pin,CF,nrep,dt,reptime,cohc,cihc,species);
+ *     vihc = model_IHC_BEZ2018(pin,CF,n_rep,dt,rep_time,cohc,cihc,species);
  *
  * vihc is the inner hair cell (IHC) relative transmembrane potential (in volts)
 
@@ -244,8 +251,9 @@ namespace stats
  *
  * @param sound_wave the input sound wave
  * @param cf characteristic frequency
- * @param nrep the number of repetitions for the psth
+ * @param n_rep the number of repetitions for the psth
  * @param time_resolution the binsize in seconds, i.e., the reciprocal of the sampling rate
+ * @param rep_time the time duration of the competition
  * @param cohc is the OHC scaling factor: 1 is normal OHC function; 0 is complete OHC dysfunction
  * @param cihc is the IHC scaling factor: 1 is normal IHC function; 0 is complete IHC dysfunction
  * @param species is the model species: "1" for cat, "2" for human with BM tuning from Shera et al. (PNAS 2002),
@@ -253,38 +261,49 @@ namespace stats
  * @returns
  */
 std::vector<double> inner_hair_cell(
-	std::vector<double> sound_wave,
+	const std::vector<double>& sound_wave,
 	double cf = 1e3,
-	size_t nrep = 10,
+	int n_rep = 10,
 	double time_resolution = 1 / 100e3, // binsize in seconds, recprocal of sampling rate
-	double reptime = 0.2, // repetition duration
+	double rep_time = 0.2, // repetition duration
 	double cohc = 1,
 	double cihc = 1,
 	Species species = HUMAN_SHERA);
 
+/**
+ * Mapping Function from IHCOUT to input to the PLA
+ * @param ihc_output 
+ * @param spontaneous_firing_rate 
+ * @param cf 
+ * @param n_timesteps 
+ * @param n_rep 
+ * @param sampling_frequency 
+ * @param time_resolution 
+ * @param mapping_function 
+ * @return 
+ */
+std::vector<double> map_to_synapse(
+	const std::vector<double>& ihc_output,
+	double spontaneous_firing_rate,
+	double cf,
+	int n_timesteps,
+	int n_rep,
+	double sampling_frequency,
+	double time_resolution,
+	SynapseMappingFunction mapping_function = SOFTPLUS // expliketype = 0
+);
 
 syn::SynapseOutput synapse(
-	std::vector<double>& pressure_wave, // px
+	const std::vector<double>& amplitude_ihc, // px
 	double cf,
-	size_t nrep,
-	int totalstim,
+	int n_rep,
+	int n_timesteps,
 	double time_resolution = 1 / 100e3, // time_resolution in seconds, recprocal of sampling rate
 	NoiseType noise = RANDOM,
-	PowerLaw approximate = APPROXIMATED, // implnttmp
+	PowerLaw pla_impl = APPROXIMATED, // implnttmp
 	double spontaneous_firing_rate = 100,
 	double abs_refractory_period = 0.7,
 	double rel_refractory_period = 0.6,
 	bool calculate_stats = true
 );
 
-
-std::vector<double> map_to_power_law(
-	double* ihcout,
-	double spont,
-	double cf,
-	int totalstim,
-	int nrep,
-	double sampFreq,
-	double tdres,
-	SynapseMappingFunction mapping_function = SOFTPLUS // expliketype = 0
-);

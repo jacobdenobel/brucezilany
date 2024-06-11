@@ -139,8 +139,7 @@ namespace utils
 		for (size_t i = 0; i < n_samples; i++)
 			y[i] = z[i].real() * root_n;
 
-		std::vector<double> output_signal(n_out);
-		resample(resample_factor, 1, y, output_signal);
+		auto output_signal = resample(resample_factor, 1, y);
 		output_signal.resize(n_out);
 
 		const double sigma = mu < .2 ? 1.0 : mu < 20 ? 10 : mu / 2.0;

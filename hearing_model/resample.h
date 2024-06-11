@@ -377,8 +377,8 @@ std::vector<T> kaiser(const int order, const T bta)
 }
 
 template <typename T>
-void resample(int up_factor, int down_factor,
-    std::vector<T>& input_signal, std::vector<T>& output_signal)
+std::vector<T> resample(int up_factor, int down_factor,
+    std::vector<T>& input_signal)
 {
 	constexpr int n = 10;
     const T bta = 5.0;
@@ -390,8 +390,7 @@ void resample(int up_factor, int down_factor,
 
     if (up_factor == down_factor)
     {
-        output_signal = input_signal;
-        return;
+        return input_signal;
     }
 
 	const int input_size = input_signal.size();
@@ -431,12 +430,10 @@ void resample(int up_factor, int down_factor,
     std::vector<T> y;
     upfirdn(up_factor, down_factor, input_signal, h, y);
 
-    //outputSignal.clear();
-    output_signal.resize(output_size);
+    auto output_signal = std::vector<T>(output_size);
 
     for (int i = delay; i < output_size + delay; i++) {
-        //outputSignal.push_back(y[i]);
         output_signal[i - delay] = y[i];
     }
-        
+    return output_signal;
 }

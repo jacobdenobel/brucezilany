@@ -17,57 +17,56 @@
  *
  */
 
-#include<array>
-#include <functional>
-#include <iomanip>
-
 #include "bruce2018.h"
 
 static constexpr double TWO_PI = 2.0 * M_PI;
 
-namespace ihc
+namespace 
 {
 	static double get_q10(const double cf, const Species species)
+{
+	switch (species)
 	{
-		switch (species)
-		{
-		case CAT:
-			return pow(10, 0.4708 * log10(cf / 1e3) + 0.4664);
-		case HUMAN_SHERA:
-			return pow((cf / 1000), 0.3) * 12.7 * 0.505 + 0.2085;
-		case HUMAN_GLASSBERG_MOORE:
-			return cf / 24.7 / (4.37 * (cf / 1000) + 1) * 0.505 + 0.2085;
-		}
+	case CAT:
+		return pow(10, 0.4708 * log10(cf / 1e3) + 0.4664);
+	case HUMAN_SHERA:
+		return pow((cf / 1000), 0.3) * 12.7 * 0.505 + 0.2085;
+	case HUMAN_GLASSBERG_MOORE:
+		return cf / 24.7 / (4.37 * (cf / 1000) + 1) * 0.505 + 0.2085;
 	}
+}
 
 	static double get_center_frequency(const double cf, const Species species)
+{
+	/** Calculate the center frequency for the control-path wideband filter
+		from the location on basilar membrane, based on Greenwood (JASA 1990) */
+	if (species == CAT) /* for cat */
 	{
-		/** Calculate the center frequency for the control-path wideband filter
-			from the location on basilar membrane, based on Greenwood (JASA 1990) */
-		if (species == CAT) /* for cat */
-		{
-			/* Cat frequency shift corresponding to 1.2 mm */
-			const double bm_place = 11.9 * log10(0.80 + cf / 456.0);
-			/* Calculate the location on basilar membrane from CF */
-			return 456.0 * (pow(10, (bm_place + 1.2) / 11.9) - 0.80); /* shift the center freq */
-		}
-
-		/* Human frequency shift corresponding to 1.2 mm */
-		const double bm_place = (35 / 2.1) * log10(1.0 + cf / 165.4);
+		/* Cat frequency shift corresponding to 1.2 mm */
+		const double bm_place = 11.9 * log10(0.80 + cf / 456.0);
 		/* Calculate the location on basilar membrane from CF */
-		return 165.4 * (pow(10, (bm_place + 1.2) / (35 / 2.1)) - 1.0); /* shift the center freq */
+		return 456.0 * (pow(10, (bm_place + 1.2) / 11.9) - 0.80); /* shift the center freq */
 	}
 
+	/* Human frequency shift corresponding to 1.2 mm */
+	const double bm_place = (35 / 2.1) * log10(1.0 + cf / 165.4);
+	/* Calculate the location on basilar membrane from CF */
+	return 165.4 * (pow(10, (bm_place + 1.2) / (35 / 2.1)) - 1.0); /* shift the center freq */
+}
+}
+
+namespace ihc
+{
 	/* -------------------------------------------------------------------------------------------- */
 	/** Calculate the delay (basilar membrane, synapse, etc. for cat) */
 	double delay_cat(const double cf)
 	{
-		double A0 = 3.0;
-		double A1 = 12.5;
-		double x = 11.9 * log10(0.80 + cf / 456.0); /* cat mapping */
-		double delay = A0 * exp(-x / A1) * 1e-3;
+		constexpr double a0 = 3.0;
+		constexpr double a1 = 12.5;
+		const double x = 11.9 * log10(0.80 + cf / 456.0); /* cat mapping */
+		const double delay = a0 * exp(-x / a1) * 1e-3;
 
-		return (delay);
+		return delay;
 	}
 
 	struct MiddleEarFilter
@@ -514,11 +513,11 @@ namespace ihc
 
 
 std::vector<double> inner_hair_cell(
-	const std::vector<double> sound_wave,
+	const std::vector<double>& sound_wave,
 	const double cf,
-	const size_t nrep,
+	const int n_rep,
 	const double time_resolution,
-	const double reptime,
+	const double rep_time,
 	const double cohc,
 	const double cihc,
 	const Species species)
@@ -528,14 +527,14 @@ std::vector<double> inner_hair_cell(
 	else
 		utils::validate_parameter(cf, 124.9, 20.1e3, "cf");
 
-	utils::validate_parameter(nrep, size_t{1}, std::numeric_limits<size_t>::max(), "nrep");
-	utils::validate_parameter(reptime, static_cast<double>(sound_wave.size()) * time_resolution,
-	                          std::numeric_limits<double>::infinity(), "reptime");
+	utils::validate_parameter(n_rep, 1, std::numeric_limits<int>::max(), "n_rep");
+	utils::validate_parameter(rep_time, static_cast<double>(sound_wave.size()) * time_resolution,
+	                          std::numeric_limits<double>::infinity(), "rep_time");
 	utils::validate_parameter(cohc, 0., 1., "cohc");
 	utils::validate_parameter(cihc, 0., 1., "cihc");
 
-	const size_t total_timesteps = static_cast<size_t>(floor(reptime / time_resolution + 0.5));
-	std::vector<double> output(total_timesteps * nrep);
+	const size_t total_timesteps = static_cast<size_t>(floor(rep_time / time_resolution + 0.5));
+	std::vector<double> output(total_timesteps * n_rep);
 
 	ihc::MiddleEarFilter me_filter(time_resolution, species);
 	ihc::WideBandGammaToneFilter wb_filter(time_resolution, cf, species, cohc);
@@ -571,7 +570,7 @@ std::vector<double> inner_hair_cell(
 		const double ihc_out = ihc_low_pass_filter(c1_ihc + c2_ihc);
 
 		if (n + delay_point < total_timesteps)
-			for (size_t j = 0; j < nrep; j++)
+			for (int j = 0; j < n_rep; j++)
 				output[(total_timesteps * j) + n + delay_point] = ihc_out;
 	}
 	return output;
