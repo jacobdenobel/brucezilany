@@ -33,10 +33,22 @@ static std::vector<double> hamming(const size_t n)
 	return window;
 }
 
-static std::vector<double> filter(const std::vector<double>& window, const std::vector<double>& signal)
+static std::vector<double> filter(const std::vector<double>& coefficients, const std::vector<double>& signal)
 {
-	auto filtered_signal = signal;
-	return filtered_signal;
+	std::vector<double> buffer(coefficients.size(), 0.0);
+	std::vector<double> output(signal.size(), 0.0);
+
+	for (size_t i = 0; i < signal.size(); i++) {
+		for (size_t k = buffer.size() - 1; k > 0; --k) 
+			buffer[k] = buffer[k - 1];
+		
+		buffer[0] = signal[i];
+
+		for (size_t k = 0; k < coefficients.size(); ++k) 
+			output[i] += coefficients[k] * buffer[k];
+	}
+
+	return output;
 }
 
 
@@ -126,7 +138,8 @@ void Neurogram::create(
 	const auto smw_ft = hamming(32);
 	const auto smw_mr = hamming(128);
 
-
+	constexpr double psthbinwidth_mr = 100e-6;
+	const double psthbins = round(psthbinwidth_mr * Fs);
 
 	for (size_t cf_i = 0; cf_i < cfs_.size(); cf_i++)
 	{
