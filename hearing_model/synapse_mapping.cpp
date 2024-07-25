@@ -23,7 +23,7 @@ namespace synapse_mapping
 		constexpr double p1 = 0.00172;
 
 		double mapping_out_k = p1 * (log(1.0 + exp(p2 * x)) - log(2.0));
-		if (isfinite(mapping_out_k) < 1)
+		if (!isfinite(mapping_out_k))
 			mapping_out_k = p1 * (p2 * x - log(2.0)); /* linear asymptote */
 		return mapping_out_k;
 	}	
@@ -71,19 +71,19 @@ namespace synapse_mapping
 		const double cf_sat = pow(10, (cf_slope * 8965.5 / 1e3 + cf_const));
 		const double cf_factor = std::min(cf_sat, pow(10, cf_slope * cf / 1e3 + cf_const)) * 2.0;
 		const double mul_factor = std::max(2.95 * std::max(1.0, 1.5 - spontaneous_firing_rate / 100), 4.3 - 0.2 * cf / 1e3);
-		const int n_total_timesteps = static_cast<int>(ihc_output.size());
-		const int delay_point = static_cast<int>(floor(7500 / (cf / 1e3)));
+		const size_t n_total_timesteps = ihc_output.size();
+		const size_t delay_point = static_cast<size_t>(floor(7500 / (cf / 1e3)));
 
-		std::vector<double> output_signal(static_cast<long>(ceil(n_total_timesteps + 3 * delay_point)));
+		std::vector<double> output_signal(n_total_timesteps + 3 * delay_point);
 		const auto mapper = get_function(mapping_function);
 
-		for (int k = 0; k < static_cast<int>(ceil(n_total_timesteps)); k++)
+		for (size_t k = 0; k < n_total_timesteps; k++)
 			output_signal[k + delay_point] = power_map(mapper(ihc_output[k]), cf_factor, mul_factor) + 3.0 * spontaneous_firing_rate;
 
-		for (int k = 0; k < delay_point; k++)
+		for (size_t k = 0; k < delay_point; k++)
 			output_signal[k] = output_signal[delay_point];
 
-		for (int k = n_total_timesteps + delay_point; k < n_total_timesteps + 3 * delay_point; k++)
+		for (size_t k = n_total_timesteps + delay_point; k < n_total_timesteps + 3 * delay_point; k++)
 			output_signal[k] = output_signal[k - 1] + 3.0 * spontaneous_firing_rate;
 
 		const int down_factor = static_cast<int>(ceil(1 / (time_resolution * sampling_frequency)));

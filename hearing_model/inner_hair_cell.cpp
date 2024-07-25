@@ -36,6 +36,8 @@ namespace
 		case HUMAN_SHERA:
 			return pow((cf / 1000), 0.3) * 12.7 * 0.505 + 0.2085;
 		case HUMAN_GLASSBERG_MOORE:
+			__fallthrough;
+		default:
 			return cf / 24.7 / (4.37 * (cf / 1000) + 1) * 0.505 + 0.2085;
 		}
 	}
@@ -176,7 +178,7 @@ namespace ihc
 		bm_tau_min = bm_tau_max * ratio_bm;
 
 		tmpcos = cos(TWO_PI * (center_freq - cf) * time_resolution);
-		gain_delay.resize(1 + static_cast<int>(floor(1.0 / (2.0 * std::sqrt(1 - pow(tmpcos, 2))))));
+		gain_delay.resize(size_t{ 1 } + static_cast<size_t>(floor(1.0 / (2.0 * std::sqrt(1 - pow(tmpcos, 2))))));
 
 		shift_poles(cohc * (bm_tau_max - bm_tau_min) + bm_tau_min, 0);
 		wb_gain = previous_gain;
@@ -193,12 +195,12 @@ namespace ihc
 		gtf[0] = std::complex<double>(cos(phase), sin(phase)) * me_out;
 
 		/* IIR Bi-linear transformation LPF */
-		for (int j = 1; j <= order; j++)
+		for (size_t j = 1; j <= static_cast<size_t>(order); j++)
 			gtf[j] = ((c2_lp * wb_gain) * (gtf[j - 1] + gtf_last[j - 1])) + (c1_lp * gtf_last[j]);
 
 		const double out = (cos(-phase) * gtf[order].real()) - (sin(-phase) * gtf[order].imag());
 
-		for (int i = 0; i <= order; i++)
+		for (size_t i = 0; i <= static_cast<size_t>(order); i++)
 			gtf_last[i] = gtf[i];
 
 		return pow((tau_wb / tau_wb_max), order) * out * 10e3 * std::max(1., cf / 5e3);
@@ -347,7 +349,7 @@ namespace ihc
 	{
 		fill_phase_array(0.0);
 
-		for (int i = 1; i <= 5; i++)
+		for (size_t i = 1; i <= size_t{ 5 }; i++)
 		{
 			const auto& p = phase_array[i * 2 - 1];
 			init_phase += atan(cf / -r0) - atan((cf - p.imag()) / -p.real()) - atan((cf + p.imag()) / -p.real());
@@ -387,7 +389,7 @@ namespace ihc
 	double ChirpFilter::operator()(const double me_out, const double r_sigma)
 	{
 		constexpr int order_of_zero = 5;
-		constexpr int half_order_pole = 5;
+		constexpr size_t half_order_pole = 5;
 
 
 		const double norm_gain = sqrt(gain_norm) / gain_denominator;
@@ -395,7 +397,7 @@ namespace ihc
 		fill_phase_array(r_sigma, !c1);
 
 		double phase = 0.0;
-		for (int i = 1; i <= half_order_pole; i++)
+		for (size_t i = 1; i <= half_order_pole; i++)
 		{
 			const auto& p = phase_array[i * 2 - 1];
 			phase = phase - atan((cf - p.imag()) / -p.real()) - atan((cf + p.imag()) / -p.real());
@@ -411,7 +413,7 @@ namespace ihc
 		input[1][1] = me_out;
 
 		double dy;
-		for (int i = 1; i <= half_order_pole; i++)
+		for (size_t i = 1; i <= half_order_pole; i++)
 		{
 			const auto& p = phase_array[i * 2 - 1];
 

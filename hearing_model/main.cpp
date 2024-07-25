@@ -60,19 +60,19 @@ std::vector<double> run_matlab_ffgn() {
 #endif
 
 void plot(
-	std::vector<std::vector<double>> vectors, 
-	const std::string& ptype = "line", 
+	std::vector<std::vector<double>> vectors,
+	const std::string& ptype = "line",
 	const std::string& title = "title",
 	const std::string& xlabel = "x",
 	const std::string& ylabel = "y",
-	bool detach=true
+	bool detach = true
 ) {
 
 	std::filesystem::path p = "C:\\Users\\Jacob\\source\\repos\\jacobdenobel\\hearing_model";
 	const auto py = (p / "venv\\Scripts\\python.exe").generic_string();
 	const auto plot = (p / "plot.py").generic_string();
 	auto command = (detach ? "start " : "") + "py "s + plot + " " + ptype + " " + title + " " + xlabel + " " + ylabel;
-	
+
 	for (auto i = 0; i < vectors.size(); i++) {
 		auto path = (title + std::to_string(i) + ".txt");
 		std::ofstream out;
@@ -95,11 +95,11 @@ std::vector<double> ramped_sine_wave(const double period, const size_t n, double
 	const size_t onbin = (size_t)std::round(ondelay * Fs); // time of first stimulus
 	std::vector<double> pin(onbin + n);
 
-	
+
 	const double amplitude = std::sqrt(2.0) * 20e-6 * std::pow(10.0, (stimdb / 20.0));
 	// Generate the stimulus sin wave
 	for (size_t i = 0; i < n; i++)
-		pin.at(onbin + i) = amplitude * std::sin(2.0 * pi * F0 * (i*period));
+		pin.at(onbin + i) = amplitude * std::sin(2.0 * pi * F0 * (i * period));
 
 	// Generate the ramps
 	for (size_t i = 0; i < irpts; i++)
@@ -115,9 +115,9 @@ std::vector<double> ramped_sine_wave(const double period, const size_t n, double
 std::vector<double> make_bins(const std::vector<double>& x, const size_t n_bins) {
 	const size_t binsize = x.size() / n_bins;
 	std::vector<double> res(n_bins, 0.0);
-	
-	for (auto i = 1; i < n_bins; i ++) 
-		res[i] = std::accumulate(x.begin() + (i -1) * binsize, x.begin() + i * binsize, 0.0);
+
+	for (size_t i = 1; i < n_bins; i++)
+		res[i] = std::accumulate(x.begin() + (i - 1) * binsize, x.begin() + i * binsize, 0.0);
 	return res;
 }
 
@@ -146,7 +146,7 @@ double variance(const std::vector<double>& x, const double m) {
 	return var / x.size();
 
 }
-double stddev(const std::vector<double>&x, const double m) {
+double stddev(const std::vector<double>& x, const double m) {
 	return std::sqrt(variance(x, m));
 }
 
@@ -199,17 +199,17 @@ void test_adaptive_redocking() {
 	const double interval = 1.0 / Fs;
 	const size_t mxpts = (size_t)(T / interval) + 1;
 	auto pin = ramped_sine_wave(interval, mxpts, Fs, rt, ondelay, F0, stimdb);
-	
+
 	auto start = std::chrono::high_resolution_clock::now();
 
 
-	auto ihc = inner_hair_cell(pin, CF, nrep, interval, 2*T, 1, 1, CAT);
-	
+	auto ihc = inner_hair_cell(pin, CF, nrep, interval, 2 * T, 1, 1, CAT);
+
 	const int totalstim = (int)(ihc.size() / nrep);
-	
+
 	// This needs the new parameters
-	auto pla = synapse_mapping::map(ihc, 
-		spont, CF,sampFreq, 
+	auto pla = synapse_mapping::map(ihc,
+		spont, CF, sampFreq,
 		interval, SOFTPLUS);
 
 
@@ -219,9 +219,9 @@ void test_adaptive_redocking() {
 	size_t n_bins_eb = ihc.size() / 500;
 	std::vector<double> ptsh(n_bins, 0.0);
 
-	if(make_plots)
+	if (make_plots)
 		plot({ pin }, "line", "stimulus");
-	 
+
 	std::vector<std::vector<double>> trd(n_bins_eb, std::vector<double>(trials));
 
 
@@ -234,16 +234,16 @@ void test_adaptive_redocking() {
 		std::cout << i << "/" << trials << std::endl;
 		auto out = synapse(pla, CF, nrep, totalstim, interval, noiseType, implnt, spont, tabs, trel);
 		auto binned = make_bins(out.psth, n_bins);
-		
-		scale(binned, 1.0/trials/psthbinwidth);
+
+		scale(binned, 1.0 / trials / psthbinwidth);
 		add(ptsh, binned);
 
-		for (int j = 0; j < n_bins_eb; j++) 
-			trd[j][i] = out.redocking_time[j * 500] *1e3;
+		for (size_t j = 0; j < n_bins_eb; j++)
+			trd[j][i] = out.redocking_time[j * 500] * 1e3;
 
 		if (i < nmax) {
 			synout_vectors[i] = out.synaptic_output;
-			for (int j = 0; j < n_bins_eb; j++)
+			for (size_t j = 0; j < n_bins_eb; j++)
 				trd_vectors[i][j] = out.redocking_time[j * 500] * 1e3;
 
 			trel_vectors[i] = out.mean_relative_refractory_period;
@@ -254,12 +254,12 @@ void test_adaptive_redocking() {
 	auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
 	std::cout << "time elapsed: " << 100.0 / duration.count() << " seconds" << std::endl;
 
-	
+
 	std::vector<double> t(n_bins);
 	for (size_t i = 0; i < n_bins; i++)
 		t[i] = i * psthbinwidth;
 
-	std::cout <<"expected: 101.86, actual: " << mean(ptsh) << std::endl;
+	std::cout << "expected: 101.86, actual: " << mean(ptsh) << std::endl;
 	std::cout << ptsh[10] << std::endl;
 	std::cout << ptsh[15] << std::endl;
 	assert(abs(mean(ptsh) - 103.4) < 1e-8);
@@ -335,7 +335,7 @@ struct Stimulus
 		rms_stim = std::sqrt(rms_stim / static_cast<double>(stim.data.size()));
 
 		for (auto& xi : stim.data)
-			xi = xi / rms_stim * 20e-6 * pow(10,  stim_db / 20);
+			xi = xi / rms_stim * 20e-6 * pow(10, stim_db / 20);
 		return stim;
 	}
 };
@@ -359,7 +359,7 @@ void example_neurogram()
 	auto species = HUMAN_SHERA;
 	Neurogram ng(40);
 	ng.create(pin, 1, sampFreq, 1.0 / Fs, 2 * T, species, RANDOM, APPROXIMATED);
-}	
+}
 
 int main() {
 	//test_adaptive_redocking();
