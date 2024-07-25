@@ -145,6 +145,7 @@
     <ClCompile Include="inner_hair_cell.cpp" />
     <ClCompile Include="interface.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="neurogram.cpp" />
     <ClCompile Include="power_law.cpp" />
     <ClCompile Include="utils.cpp" />
     <ClCompile Include="synapse.cpp" />
@@ -153,6 +154,7 @@
   <ItemGroup>
     <ClInclude Include="bruce2018.h" />
     <ClInclude Include="inner_hair_cell.h" />
+    <ClInclude Include="neurogram.h" />
     <ClInclude Include="power_law.h" />
     <ClInclude Include="resample.h" />
     <ClInclude Include="synapse.h" />

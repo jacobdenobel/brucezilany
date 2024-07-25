@@ -110,6 +110,12 @@ namespace utils
 		return d(GENERATOR);
 	}
 
+	double randn1()
+	{
+		static std::normal_distribution<double> d(0, 1.0);
+		return d(GENERATOR);
+	}
+
 	std::vector<double> randn(const size_t n)
 	{
 		static std::normal_distribution<double> d(0, 1.0);

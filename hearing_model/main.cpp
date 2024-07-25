@@ -124,7 +124,7 @@ std::vector<double> make_bins(const std::vector<double>& x, const size_t n_bins)
 std::vector<double> cumsum(const std::vector<double>& x) {
 	std::vector<double> res(x.size());
 	res[0] = x[0];
-	for (auto i = 1; i < x.size(); i++)
+	for (size_t i = 1; i < x.size(); i++)
 		res[i] = res[i - 1] + x[i];
 	return res;
 }
@@ -208,7 +208,9 @@ void test_adaptive_redocking() {
 	const int totalstim = (int)(ihc.size() / nrep);
 	
 	// This needs the new parameters
-	auto pla = synapse_mapping::map(ihc, spont, CF,sampFreq, interval, SOFTPLUS);
+	auto pla = synapse_mapping::map(ihc, 
+		spont, CF,sampFreq, 
+		interval, SOFTPLUS);
 
 
 	double psthbinwidth = 5e-4;
@@ -340,10 +342,26 @@ struct Stimulus
 
 void example_neurogram()
 {
-	auto species = HUMAN_SHERA;
+	static double sampFreq = 10e3;
+	static int CF = (int)5e3;
+	static double stimdb = 60.0;                // stimulus intensity in dB SPL
+	static double F0 = static_cast<double>(CF); // stimulus frequency in Hz
+	static int Fs = (int)100e3;                 // sampling rate in Hz (must be 100, 200 or 500 kHz)
+	static double T = 0.25;                     // stimulus duration in seconds
+	static double rt = 2.5e-3;                  // rise/fall time in seconds
+	static double ondelay = 25e-3;				// delay for the stim
 
+	const double interval = 1.0 / Fs;
+	const size_t mxpts = (size_t)(T / interval) + 1;
+	auto pin = ramped_sine_wave(interval, mxpts, Fs, rt, ondelay, F0, stimdb);
+
+
+	auto species = HUMAN_SHERA;
+	Neurogram ng(40);
+	ng.create(pin, 1, sampFreq, 1.0 / Fs, 2 * T, species, RANDOM, APPROXIMATED);
 }	
 
 int main() {
-	test_adaptive_redocking();
+	//test_adaptive_redocking();
+	example_neurogram();
 }

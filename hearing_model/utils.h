@@ -60,6 +60,12 @@ namespace utils
 	double rand1();
 
 	/**
+	 * Generate a single standard normal (mu = 0, sigma = 1) random number
+	 * @return the number
+	 */
+	double randn1();
+
+	/**
 	 * Generate a vector of standard normally distributed random numbers
 	 * @param n the size of the vector 
 	 * @return the vector with random numbers

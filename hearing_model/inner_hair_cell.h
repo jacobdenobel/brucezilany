@@ -155,9 +155,9 @@ namespace ihc
  *
  *
  * NOTE ON SAMPLING RATE:-
- * Since version 2 of the code, it is possible to run the model at a range
+ * Since version 2 of the code, it is possible to create the model at a range
  * of sampling rates between 100 kHz and 500 kHz.
- * It is recommended to run the model at 100 kHz for CFs up to 20 kHz, and
+ * It is recommended to create the model at 100 kHz for CFs up to 20 kHz, and
  * at 200 kHz for CFs> 20 kHz to 40 kHz.
  *
  * @param sound_wave the input sound wave

@@ -106,9 +106,9 @@ namespace syn
  *     [psth,meanrate,varrate,synout,trd_vector,trel_vector] = model_Synapse_BEZ2018(vihc,CF,nrep,dt,noiseType,implnt,spont,tabs,trel);
  *
  * NOTE ON SAMPLING RATE:-
- * Since version 2 of the code, it is possible to run the model at a range
+ * Since version 2 of the code, it is possible to create the model at a range
  * of sampling rates between 100 kHz and 500 kHz.
- * It is recommended to run the model at 100 kHz for CFs up to 20 kHz, and
+ * It is recommended to create the model at 100 kHz for CFs up to 20 kHz, and
  * at 200 kHz for CFs> 20 kHz to 40 kHz.
  *
  * @param amplitude_ihc (vihc) is the inner hair cell (IHC) relative transmembrane potential (in volts)

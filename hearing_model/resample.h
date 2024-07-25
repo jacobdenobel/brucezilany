@@ -226,7 +226,7 @@ void upfirdn(int up_rate, int down_rate,
 
     results.resize(results_count);
 
-    // run filtering
+    // create filtering
     the_resampler.apply(input_padded,
                         in_length + padding, &results[0], results_count);
     delete[] input_padded;
