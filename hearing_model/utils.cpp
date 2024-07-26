@@ -1,10 +1,10 @@
 #include "bruce2018.h"
 
-namespace 
+namespace
 {
 	std::vector<double> generate_zmag(const size_t n_samples)
 	{
-		static std::vector<double> z_mag;
+		thread_local std::vector<double> z_mag;
 
 		// Only generate z_mag whenever n_samples changes
 		if (z_mag.size() != n_samples)
@@ -106,19 +106,19 @@ namespace utils
 
 	double rand1()
 	{
-		static std::uniform_real_distribution<double> d(0, 1.0);
+		thread_local std::uniform_real_distribution<double> d(0, 1.0);
 		return d(GENERATOR);
 	}
 
 	double randn1()
 	{
-		static std::normal_distribution<double> d(0, 1.0);
+		thread_local std::normal_distribution<double> d(0, 1.0);
 		return d(GENERATOR);
 	}
 
 	std::vector<double> randn(const size_t n)
 	{
-		static std::normal_distribution<double> d(0, 1.0);
+		thread_local std::normal_distribution<double> d(0, 1.0);
 		return random(n, d);
 	}
 
@@ -130,11 +130,12 @@ namespace utils
 		constexpr int resample_factor = 1000;
 
 		const size_t n_samples = static_cast<int>(std::max(10.0, std::ceil(n_out / resample_factor) + 1));
-		static std::vector<double> y(n_samples);
-		static std::vector<double> z_mag = generate_zmag(n_samples);
-		static std::valarray<std::complex<double>> z(z_mag.size());
-		static std::vector<double> zr1(z_mag.size());
-		static std::vector<double> zr2(z_mag.size());
+
+		thread_local std::vector<double> y(n_samples);
+		thread_local std::vector<double> z_mag = generate_zmag(n_samples);
+		thread_local std::valarray<std::complex<double>> z(z_mag.size());
+		thread_local std::vector<double> zr1(z_mag.size());
+		thread_local std::vector<double> zr2(z_mag.size());
 
 		fill_noise_vectors(zr1, zr2, noise);
 
@@ -144,6 +145,7 @@ namespace utils
 		ifft(z);
 
 		const double root_n = std::sqrt(z_mag.size());
+		
 		for (size_t i = 0; i < n_samples; i++)
 			y[i] = z[i].real() * root_n;
 
@@ -215,5 +217,101 @@ namespace utils
 
 		// scale the numbers
 		x /= static_cast<double>(x.size());
+	}
+
+
+	std::vector<double> make_bins(const std::vector<double>& x, const size_t n_bins) {
+		const size_t binsize = x.size() / n_bins;
+		std::vector<double> res(n_bins, 0.0);
+
+		for (size_t i = 1; i < n_bins; i++)
+			res[i] = std::accumulate(x.begin() + (i - 1) * binsize, x.begin() + i * binsize, 0.0);
+		return res;
+	}
+
+	std::vector<double> cum_sum(const std::vector<double>& x) {
+		std::vector<double> res(x.size());
+		res[0] = x[0];
+		for (size_t i = 1; i < x.size(); i++)
+			res[i] = res[i - 1] + x[i];
+		return res;
+	}
+
+	void add(std::vector<double>& x, const std::vector<double>& y) {
+		for (size_t i = 0; i < x.size(); i++)
+			x[i] += y[i];
+	}
+
+	void scale(std::vector<double>& x, const double y) {
+		for (size_t i = 0; i < x.size(); i++)
+			x[i] *= y;
+	}
+
+	double variance(const std::vector<double>& x, const double m) {
+		double var = 0.0;
+		for (const auto& xi : x)
+			var += (xi - m) * (xi - m);
+		return var / x.size();
+
+	}
+	double std(const std::vector<double>& x, const double m) {
+		return std::sqrt(variance(x, m));
+	}
+
+	double mean(const std::vector<double>& x) {
+		return std::accumulate(x.begin(), x.end(), 0.0) / x.size();
+	}
+
+	std::vector<double> reduce_mean(const std::vector<std::vector<double>>& x) {
+		std::vector<double> y(x.size());
+		for (size_t i = 0; i < x.size(); i++)
+			y[i] = mean(x[i]);
+		return y;
+	}
+
+	std::vector<double> reduce_std(const std::vector<std::vector<double>>& x, const std::vector<double>& means) {
+		std::vector<double> y(x.size());
+		for (size_t i = 0; i < x.size(); i++)
+			y[i] = std(x[i], means[i]);
+		return y;
+	}
+
+	std::vector<double> log_space(const double start, const double end, const size_t n)
+	{
+		std::vector<double> space(n);
+		const double step = (end - start) / (static_cast<double>(n) - 1.0);
+		double current = start;
+		for (size_t i = 0; i < n; i++)
+		{
+			space[i] = pow(10.0, current);
+			current += step;
+		}
+		return space;
+	}
+
+	std::vector<double> hamming(const size_t n)
+	{
+		std::vector<double> window(n);
+		for (size_t i = 0; i < n; i++)
+			window[i] = 0.54 - 0.46 * std::cos(2 * M_PI * static_cast<double>(i) / (static_cast<double>(n) - 1));
+		return window;
+	}
+
+	std::vector<double> filter(const std::vector<double>& coefficients, const std::vector<double>& signal)
+	{
+		std::vector<double> buffer(coefficients.size(), 0.0);
+		std::vector<double> output(signal.size(), 0.0);
+
+		for (size_t i = 0; i < signal.size(); i++) {
+			for (size_t k = buffer.size() - 1; k > 0; --k)
+				buffer[k] = buffer[k - 1];
+
+			buffer[0] = signal[i];
+
+			for (size_t k = 0; k < coefficients.size(); ++k)
+				output[i] += coefficients[k] * buffer[k];
+		}
+
+		return output;
 	}
 }

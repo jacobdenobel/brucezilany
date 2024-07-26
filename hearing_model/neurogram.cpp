@@ -1,66 +1,14 @@
 #include "neurogram.h"
 
-#include <corecrt_math_defines.h>
-
-#include "synapse_mapping.h"
-
-/**
- * Generate a log_space, works similar to how np.log_space or matlabs log_space works.
- *
- * @param start start of the range
- * @param end end of the range
- * @param n the number of points to be generated
- * @return a vector of n log10 space points
- */
-static std::vector<double> log_space(const double start, const double end, const size_t n)
-{
-	std::vector<double> space(n);
-	const double step = (end - start) / (static_cast<double>(n) - 1.0);
-	double current = start;
-	for (size_t i = 0; i < n; i++)
-	{
-		space[i] = pow(10.0, current);
-		current += step;
-	}
-	return space;
-}
-
-static std::vector<double> hamming(const size_t n)
-{
-	std::vector<double> window(n);
-	for (size_t i = 0; i < n; i++)
-		window[i] = 0.54 - 0.46 * std::cos(2 * M_PI * static_cast<double>(i) / (static_cast<double>(n) - 1));
-	return window;
-}
-
-static std::vector<double> filter(const std::vector<double>& coefficients, const std::vector<double>& signal)
-{
-	std::vector<double> buffer(coefficients.size(), 0.0);
-	std::vector<double> output(signal.size(), 0.0);
-
-	for (size_t i = 0; i < signal.size(); i++) {
-		for (size_t k = buffer.size() - 1; k > 0; --k) 
-			buffer[k] = buffer[k - 1];
-		
-		buffer[0] = signal[i];
-
-		for (size_t k = 0; k < coefficients.size(); ++k) 
-			output[i] += coefficients[k] * buffer[k];
-	}
-
-	return output;
-}
-
-
 
 Neurogram::Neurogram(const size_t n_cf) :
-	cfs_(log_space(std::log10(250.0), std::log10(16e3), n_cf)),
+	cfs_(utils::log_space(std::log10(250.0), std::log10(16e3), n_cf)),
 	// assumes no hearing loss
 	db_loss_(n_cf, 0.0),
 	coh_cs_(n_cf, 1.0),
 	ihc_cs_(n_cf, 1.0),
 	ohc_loss_(n_cf, 0.0),
-	an_population_(Neurogram::generate_an_population(n_cf, 10, 10, 30))
+	an_population_(generate_an_population(n_cf, 10, 10, 30))
 {
 }
 
@@ -104,8 +52,8 @@ std::array<std::vector<Fiber>, 3> Neurogram::generate_an_population(
 {
 	return {
 		generate_fiber_set(n_cf, n_low, LOW, .1, .1, 1e-3, .2),
-		generate_fiber_set(n_cf, n_med,MEDIUM, 4.0, 4.0, .2, 18.0),
-		generate_fiber_set(n_cf, n_high,HIGH, 70.0, 30, 18.0, 180.)
+		generate_fiber_set(n_cf, n_med, MEDIUM, 4.0, 4.0, .2, 18.0),
+		generate_fiber_set(n_cf, n_high, HIGH, 70.0, 30, 18.0, 180.)
 	};
 }
 
@@ -123,6 +71,78 @@ std::vector<Fiber> Neurogram::get_fibers(const size_t cf_idx) const
 }
 
 
+void Neurogram::evaluate_fiber(
+	const size_t cf_i,
+	const std::vector<double>& ihc,
+	const int n_rep,
+	const double sampling_freq,
+	const double time_resolution,
+	const NoiseType noise_type,
+	const PowerLaw power_law,
+	const size_t n_timesteps,
+	const std::vector<double>& smw_ft,
+	const Fiber& fiber
+)
+{
+	const auto pla = synapse_mapping::map(ihc,
+	                                      fiber.spont,
+	                                      cfs_[cf_i],
+	                                      sampling_freq,
+	                                      time_resolution,
+	                                      SOFTPLUS
+	);
+	const auto out = synapse(pla,
+	                         cfs_[cf_i], n_rep,
+	                         static_cast<int>(n_timesteps),
+	                         time_resolution,
+	                         noise_type,
+	                         power_law,
+	                         fiber.spont,
+	                         fiber.tabs,
+	                         fiber.trel
+	);
+	mutex_.lock();
+	utils::add(fine_timing_[cf_i], utils::filter(smw_ft, out.psth));
+	mutex_.unlock();
+}
+
+
+void Neurogram::evaluate_cf(
+	const size_t cf_i,
+	const std::vector<double>& sound_wave,
+	const int n_rep,
+	const double sampling_freq,
+	const double time_resolution,
+	const double rep_time,
+	const Species species,
+	const NoiseType noise_type,
+	const PowerLaw power_law,
+	const size_t n_timesteps,
+	const std::vector<double>& smw_ft
+)
+{
+	const auto fibers = get_fibers(cf_i);
+
+	const auto ihc = inner_hair_cell(
+		sound_wave, cfs_[cf_i], n_rep, time_resolution, rep_time, coh_cs_[cf_i], ihc_cs_[cf_i], species
+	);
+
+	assert(static_cast<int>(ihc.size() / n_rep) == n_timesteps);
+
+	std::vector<std::thread> threads(fibers.size());
+	for (size_t f_id = 0; f_id < fibers.size(); f_id++)
+	{
+		threads[f_id] = std::thread(&Neurogram::evaluate_fiber, this, cf_i, ihc, n_rep, sampling_freq, time_resolution,
+			noise_type, power_law, n_timesteps, smw_ft, fibers[f_id]);
+	}
+
+	for (auto& th : threads)
+		th.join();
+
+	std::cout << cf_i << '\n';
+}
+
+
 void Neurogram::create(
 	const std::vector<double>& sound_wave,
 	const int n_rep,
@@ -134,48 +154,25 @@ void Neurogram::create(
 	const PowerLaw power_law
 )
 {
+	const auto smw_ft = utils::hamming(32);
+	const auto smw_mr = utils::hamming(128);
 
-	const auto smw_ft = hamming(32);
-	const auto smw_mr = hamming(128);
+	//constexpr double psthbinwidth_mr = 100e-6;
+	//const double psthbins = round(psthbinwidth_mr * Fs);
 
-	constexpr double psthbinwidth_mr = 100e-6;
-	const double psthbins = round(psthbinwidth_mr * Fs);
+	const auto n_timesteps = static_cast<int>(std::ceil(rep_time / time_resolution));
+	fine_timing_ = std::vector(cfs_.size(), std::vector(n_timesteps, 0.0));
 
+
+	std::vector<std::thread> threads(cfs_.size());
 	for (size_t cf_i = 0; cf_i < cfs_.size(); cf_i++)
 	{
-		const auto fibers = get_fibers(cf_i);
-
-		const auto ihc = inner_hair_cell(
-			sound_wave, cfs_[cf_i], n_rep, time_resolution, rep_time, coh_cs_[cf_i], ihc_cs_[cf_i], species
-		);
-
-		const int n_timesteps = static_cast<int>(ihc.size() / n_rep);
-
-		for (const auto& fiber : fibers)
-		{
-			const auto pla = synapse_mapping::map(ihc,
-				fiber.spont,
-				cfs_[cf_i],
-				sampling_freq,
-				time_resolution,
-				SOFTPLUS
-			);
-			auto out = synapse(pla,
-				cfs_[cf_i], n_rep,
-				n_timesteps,
-				time_resolution,
-				noise_type,
-				power_law,
-				fiber.spont,
-				fiber.tabs,
-				fiber.trel
-			);
-			auto ptsh_mr = out.psth;
-			auto neurogram_ft = filter(smw_ft, out.psth);
-			auto neurogram_mr = filter(smw_mr, ptsh_mr);
-			break;
-		}
-
-		break;
+		threads[cf_i] = std::thread(&Neurogram::evaluate_cf, this, cf_i, sound_wave, n_rep, sampling_freq,
+		                            time_resolution, rep_time, species, noise_type, power_law, n_timesteps, smw_ft);
 	}
+
+	for (auto& th : threads)
+		th.join();
+
+	std::cout << "done\n";
 }

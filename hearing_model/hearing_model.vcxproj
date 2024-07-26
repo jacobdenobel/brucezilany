@@ -147,6 +147,7 @@
     <ClCompile Include="main.cpp" />
     <ClCompile Include="neurogram.cpp" />
     <ClCompile Include="power_law.cpp" />
+    <ClCompile Include="stimulus.cpp" />
     <ClCompile Include="utils.cpp" />
     <ClCompile Include="synapse.cpp" />
     <ClCompile Include="synapse_mapping.cpp" />
@@ -157,6 +158,7 @@
     <ClInclude Include="neurogram.h" />
     <ClInclude Include="power_law.h" />
     <ClInclude Include="resample.h" />
+    <ClInclude Include="stimulus.h" />
     <ClInclude Include="synapse.h" />
     <ClInclude Include="synapse_mapping.h" />
     <ClInclude Include="types.h" />

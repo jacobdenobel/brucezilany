@@ -88,87 +88,6 @@ void plot(
 	system(command.c_str());
 }
 
-std::vector<double> ramped_sine_wave(const double period, const size_t n, double Fs, double rt, double ondelay, double F0, double stimdb) {
-	static double pi = 3.141592653589793;
-	// Generate stimulus
-	const size_t irpts = (size_t)rt * (size_t)Fs;
-	const size_t onbin = (size_t)std::round(ondelay * Fs); // time of first stimulus
-	std::vector<double> pin(onbin + n);
-
-
-	const double amplitude = std::sqrt(2.0) * 20e-6 * std::pow(10.0, (stimdb / 20.0));
-	// Generate the stimulus sin wave
-	for (size_t i = 0; i < n; i++)
-		pin.at(onbin + i) = amplitude * std::sin(2.0 * pi * F0 * (i * period));
-
-	// Generate the ramps
-	for (size_t i = 0; i < irpts; i++)
-	{
-		const double ramp = static_cast<double>(i) / irpts;
-		pin.at(onbin + i) = pin.at(onbin + i) * ramp;                 // upramp
-		pin.at(onbin + n - i - 1) = pin.at(onbin + n - i - 1) * ramp; // downramp
-	}
-	return pin;
-}
-
-
-std::vector<double> make_bins(const std::vector<double>& x, const size_t n_bins) {
-	const size_t binsize = x.size() / n_bins;
-	std::vector<double> res(n_bins, 0.0);
-
-	for (size_t i = 1; i < n_bins; i++)
-		res[i] = std::accumulate(x.begin() + (i - 1) * binsize, x.begin() + i * binsize, 0.0);
-	return res;
-}
-
-std::vector<double> cumsum(const std::vector<double>& x) {
-	std::vector<double> res(x.size());
-	res[0] = x[0];
-	for (size_t i = 1; i < x.size(); i++)
-		res[i] = res[i - 1] + x[i];
-	return res;
-}
-
-void add(std::vector<double>& x, std::vector<double>& y) {
-	for (int i = 0; i < x.size(); i++)
-		x[i] += y[i];
-}
-
-void scale(std::vector<double>& x, double y) {
-	for (int i = 0; i < x.size(); i++)
-		x[i] *= y;
-}
-
-double variance(const std::vector<double>& x, const double m) {
-	double var = 0.0;
-	for (const auto& xi : x)
-		var += (xi - m) * (xi - m);
-	return var / x.size();
-
-}
-double stddev(const std::vector<double>& x, const double m) {
-	return std::sqrt(variance(x, m));
-}
-
-double mean(const std::vector<double>& x) {
-	return std::accumulate(x.begin(), x.end(), 0.0) / x.size();
-}
-
-std::vector<double> reduce_mean(const std::vector<std::vector<double>>& x) {
-	std::vector<double> y(x.size());
-	for (size_t i = 0; i < x.size(); i++)
-		y[i] = mean(x[i]);
-	return y;
-}
-
-std::vector<double> reduce_std(const std::vector<std::vector<double>>& x, const std::vector<double>& means) {
-	std::vector<double> y(x.size());
-	for (size_t i = 0; i < x.size(); i++)
-		y[i] = stddev(x[i], means[i]);
-	return y;
-}
-
-
 
 
 void test_adaptive_redocking() {
@@ -198,7 +117,7 @@ void test_adaptive_redocking() {
 
 	const double interval = 1.0 / Fs;
 	const size_t mxpts = (size_t)(T / interval) + 1;
-	auto pin = ramped_sine_wave(interval, mxpts, Fs, rt, ondelay, F0, stimdb);
+	auto pin = stimulus::ramped_sine_wave(interval, mxpts, Fs, rt, ondelay, F0, stimdb);
 
 	auto start = std::chrono::high_resolution_clock::now();
 
@@ -233,10 +152,10 @@ void test_adaptive_redocking() {
 	for (auto i = 0; i < trials; i++) {
 		std::cout << i << "/" << trials << std::endl;
 		auto out = synapse(pla, CF, nrep, totalstim, interval, noiseType, implnt, spont, tabs, trel);
-		auto binned = make_bins(out.psth, n_bins);
+		auto binned = utils::make_bins(out.psth, n_bins);
 
-		scale(binned, 1.0 / trials / psthbinwidth);
-		add(ptsh, binned);
+		utils::scale(binned, 1.0 / trials / psthbinwidth);
+		utils::add(ptsh, binned);
 
 		for (size_t j = 0; j < n_bins_eb; j++)
 			trd[j][i] = out.redocking_time[j * 500] * 1e3;
@@ -247,7 +166,7 @@ void test_adaptive_redocking() {
 				trd_vectors[i][j] = out.redocking_time[j * 500] * 1e3;
 
 			trel_vectors[i] = out.mean_relative_refractory_period;
-			scale(trel_vectors[i], 1e3);
+			utils::scale(trel_vectors[i], 1e3);
 		}
 	}
 	auto stop = std::chrono::high_resolution_clock::now();
@@ -259,10 +178,10 @@ void test_adaptive_redocking() {
 	for (size_t i = 0; i < n_bins; i++)
 		t[i] = i * psthbinwidth;
 
-	std::cout << "expected: 101.86, actual: " << mean(ptsh) << std::endl;
+	std::cout << "expected: 101.86, actual: " << utils::mean(ptsh) << std::endl;
 	std::cout << ptsh[10] << std::endl;
 	std::cout << ptsh[15] << std::endl;
-	assert(abs(mean(ptsh) - 103.4) < 1e-8);
+	assert(abs(utils::mean(ptsh) - 103.4) < 1e-8);
 	assert(ptsh[10] == 200.0);
 	assert(ptsh[15] == 200.0);
 
@@ -275,8 +194,8 @@ void test_adaptive_redocking() {
 		for (size_t i = 0; i < n_bins_eb; i++)
 			t[i] = i * interval;
 
-		auto m = reduce_mean(trd);
-		auto s = reduce_std(trd, m);
+		auto m = utils::reduce_mean(trd);
+		auto s = utils::reduce_std(trd, m);
 		plot({ m, s, t }, "errorbar", "RedockingTime", "Time(s)", "t_{rd}(ms)");
 
 		plot(synout_vectors, "line", "OutputRate", "x", "S_{out}");
@@ -285,13 +204,6 @@ void test_adaptive_redocking() {
 	}
 }
 
-template<typename T>
-void print(const std::vector<T>& x) {
-	for (auto& xi : x) {
-		std::cout << xi << " ";
-	}
-	std::cout << std::endl;
-}
 
 
 std::vector<double> read_file(const std::string& fname) {
@@ -309,36 +221,7 @@ std::vector<double> read_file(const std::string& fname) {
 }
 
 
-struct Stimulus
-{
-	size_t frequency;
-	std::vector<double> data;
 
-	Stimulus read(const std::string path)
-	{
-
-		//[stim, Fs_stim] = audioread('defineit.wav');
-		// stimdb = 65;% speech level in dB SPL
-		// stim = stim / rms(stim) * 20e-6 * 10 ^ (stimdb / 20);*/
-		Stimulus s;
-		s = normalize_db(s);
-		return s;
-	}
-
-	static Stimulus& normalize_db(Stimulus& stim)
-	{
-		const double stim_db = 65;
-
-		double rms_stim = 0.0;
-		for (const auto& xi : stim.data)
-			rms_stim += xi * xi;
-		rms_stim = std::sqrt(rms_stim / static_cast<double>(stim.data.size()));
-
-		for (auto& xi : stim.data)
-			xi = xi / rms_stim * 20e-6 * pow(10, stim_db / 20);
-		return stim;
-	}
-};
 
 void example_neurogram()
 {
@@ -353,7 +236,7 @@ void example_neurogram()
 
 	const double interval = 1.0 / Fs;
 	const size_t mxpts = (size_t)(T / interval) + 1;
-	auto pin = ramped_sine_wave(interval, mxpts, Fs, rt, ondelay, F0, stimdb);
+	auto pin = stimulus::ramped_sine_wave(interval, mxpts, Fs, rt, ondelay, F0, stimdb);
 
 
 	auto species = HUMAN_SHERA;
