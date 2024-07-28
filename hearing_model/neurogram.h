@@ -90,7 +90,7 @@ public:
 		const std::vector<double>& smw_ft,
 		const Fiber& fiber
 	);
-	
+
 
 };
 

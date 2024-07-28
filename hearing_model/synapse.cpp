@@ -289,7 +289,7 @@ syn::SynapseOutput synapse(
 
 
 	const auto pla_out = pla::power_law(amplitude_ihc, noise, pla_impl, spontaneous_firing_rate, sampling_frequency,
-	                                    delay_point, time_resolution, res.n_total_timesteps);
+		delay_point, time_resolution, res.n_total_timesteps);
 
 	up_sample_synaptic_output(pla_out, time_resolution, sampling_frequency, delay_point, res);
 
@@ -297,7 +297,7 @@ syn::SynapseOutput synapse(
 	///*======  Synaptic Release/Spike Generation Parameters ======*/
 	constexpr int n_sites = 4; /* Number of synaptic release sites */
 	const int n_spikes = syn::spike_generator<n_sites>(time_resolution, spontaneous_firing_rate, abs_refractory_period,
-	                                                   rel_refractory_period, res);
+		rel_refractory_period, res);
 
 	if (calculate_stats)
 		calculate_refractory_and_redocking_stats(

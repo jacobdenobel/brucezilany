@@ -145,7 +145,7 @@ namespace utils
 		ifft(z);
 
 		const double root_n = std::sqrt(z_mag.size());
-		
+
 		for (size_t i = 0; i < n_samples; i++)
 			y[i] = z[i].real() * root_n;
 
@@ -251,7 +251,7 @@ namespace utils
 		double var = 0.0;
 		for (const auto& xi : x)
 			var += (xi - m) * (xi - m);
-		return var / x.size();
+		return var / static_cast<double>(x.size());
 
 	}
 	double std(const std::vector<double>& x, const double m) {
@@ -299,8 +299,8 @@ namespace utils
 
 	std::vector<double> filter(const std::vector<double>& coefficients, const std::vector<double>& signal)
 	{
-		std::vector<double> buffer(coefficients.size(), 0.0);
-		std::vector<double> output(signal.size(), 0.0);
+		std::vector buffer(coefficients.size(), 0.0);
+		std::vector output(signal.size(), 0.0);
 
 		for (size_t i = 0; i < signal.size(); i++) {
 			for (size_t k = buffer.size() - 1; k > 0; --k)

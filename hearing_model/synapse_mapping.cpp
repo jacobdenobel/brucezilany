@@ -10,7 +10,7 @@ namespace synapse_mapping
 		double res = pow(10, 0.9 * log10(fabs(x) * cf_factor) + mul_factor);
 		if (x < 0) res = -res;
 		return res;
-	}	
+	}
 
 	double none(const double x)
 	{
@@ -26,7 +26,7 @@ namespace synapse_mapping
 		if (!isfinite(mapping_out_k))
 			mapping_out_k = p1 * (p2 * x - log(2.0)); /* linear asymptote */
 		return mapping_out_k;
-	}	
+	}
 
 	double exponential(const double x) {
 		constexpr double p1 = 0.001268;

@@ -3,11 +3,11 @@
 namespace pla
 {
 	void approximate(
-		const std::vector<double>& amplitude_ihc, 
-		const std::vector<double>& random_numbers, 
+		const std::vector<double>& amplitude_ihc,
+		const std::vector<double>& random_numbers,
 		const int n,
-		const double alpha1, 
-		const double alpha2, 
+		const double alpha1,
+		const double alpha2,
 		std::vector<double>& synapse_out
 	)
 	{
@@ -63,12 +63,12 @@ namespace pla
 	}
 
 	void actual(
-		const std::vector<double>& amplitude_ihc, 
+		const std::vector<double>& amplitude_ihc,
 		const std::vector<double>& random_numbers,
-		const int n, 
-		const double alpha1, 
-		const double alpha2, 
-		const double beta1, 
+		const int n,
+		const double alpha1,
+		const double alpha2,
+		const double beta1,
 		const double beta2,
 		const double bin_width,
 		std::vector<double>& synapse_out
@@ -94,11 +94,11 @@ namespace pla
 	}
 
 	std::vector<double> power_law(
-		const std::vector<double>& amplitude_ihc, 
+		const std::vector<double>& amplitude_ihc,
 		const NoiseType noise,
 		const PowerLaw impl,
 		const double spontaneous_firing_rate,
-		const double sampling_frequency, 
+		const double sampling_frequency,
 		const double delay_point,
 		const double time_resolution,
 		const int n_total_timesteps
