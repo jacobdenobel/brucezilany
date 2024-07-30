@@ -440,11 +440,9 @@ namespace ihc
 
 
 std::vector<double> inner_hair_cell(
-	const std::vector<double>& sound_wave,
+	const stimulus::Stimulus& stimulus,
 	const double cf,
 	const int n_rep,
-	const double time_resolution,
-	const double rep_time,
 	const double cohc,
 	const double cihc,
 	const Species species)
@@ -455,31 +453,30 @@ std::vector<double> inner_hair_cell(
 		utils::validate_parameter(cf, 124.9, 20.1e3, "cf");
 
 	utils::validate_parameter(n_rep, 1, std::numeric_limits<int>::max(), "n_rep");
-	utils::validate_parameter(rep_time, static_cast<double>(sound_wave.size()) * time_resolution,
-	                          std::numeric_limits<double>::infinity(), "rep_time");
+	utils::validate_parameter(stimulus.simulation_duration, stimulus.stimulus_duration,
+	                          std::numeric_limits<double>::infinity(), "stimulus.simulation_duration");
 	utils::validate_parameter(cohc, 0., 1., "cohc");
 	utils::validate_parameter(cihc, 0., 1., "cihc");
 
-	const size_t total_timesteps = static_cast<size_t>(floor(rep_time / time_resolution + 0.5));
-	std::vector<double> output(total_timesteps * n_rep);
+	std::vector<double> output(stimulus.n_simulation_timesteps * n_rep);
 
-	ihc::MiddleEarFilter me_filter(time_resolution, species);
-	ihc::WideBandGammaToneFilter wb_filter(time_resolution, cf, species, cohc);
+	ihc::MiddleEarFilter me_filter(stimulus.time_resolution, species);
+	ihc::WideBandGammaToneFilter wb_filter(stimulus.time_resolution, cf, species, cohc);
 	ihc::BoltzmanFilter boltzman_filter{7.0};
-	ihc::LowPassFilter<2> ohc_low_pass_filter(time_resolution, 600.);
+	ihc::LowPassFilter<2> ohc_low_pass_filter(stimulus.time_resolution, 600.);
 	ihc::PostOhcFilter non_linear_after_ohc_filter{cohc, wb_filter.bm_tau_min, wb_filter.bm_tau_max, 7.0};
-	ihc::ChirpFilter c1_chirp_filter{time_resolution, cf, wb_filter.bm_tau_max, true};
-	ihc::ChirpFilter c2_chirp_filter{time_resolution, cf, wb_filter.bm_tau_max, false};
+	ihc::ChirpFilter c1_chirp_filter{ stimulus.time_resolution, cf, wb_filter.bm_tau_max, true};
+	ihc::ChirpFilter c2_chirp_filter{ stimulus.time_resolution, cf, wb_filter.bm_tau_max, false};
 	ihc::LogarithmicTransductionFunction ltf_1{0.1, 3.0};
 	ihc::LogarithmicTransductionFunction ltf_2{0.2, 1.0};
-	ihc::LowPassFilter<7> ihc_low_pass_filter(time_resolution, 3000);
+	ihc::LowPassFilter<7> ihc_low_pass_filter(stimulus.time_resolution, 3000);
 
 	const double delay = ihc::delay_cat(cf); // human uses same delay function
-	const int delay_point = std::max(0, static_cast<int>(ceil(delay / time_resolution)));
+	const int delay_point = std::max(0, static_cast<int>(ceil(delay / stimulus.time_resolution)));
 
-	for (size_t n = 0; n < total_timesteps; n++)
+	for (size_t n = 0; n < stimulus.n_simulation_timesteps; n++)
 	{
-		const double px = n < sound_wave.size() ? sound_wave[n] : 0.0;
+		const double px = n < stimulus.n_stimulation_timesteps ? stimulus.data[n] : 0.0;
 		const double me_out = me_filter(px);
 		const double wb_out = wb_filter(me_out);
 		const double ohc_nonlinear_out = boltzman_filter(wb_out);
@@ -496,9 +493,9 @@ std::vector<double> inner_hair_cell(
 
 		const double ihc_out = ihc_low_pass_filter(c1_ihc + c2_ihc);
 
-		if (n + delay_point < total_timesteps)
+		if (n + delay_point < stimulus.n_simulation_timesteps)
 			for (int j = 0; j < n_rep; j++)
-				output[(total_timesteps * j) + n + delay_point] = ihc_out;
+				output[(stimulus.n_simulation_timesteps * j) + n + delay_point] = ihc_out;
 	}
 	return output;
 }

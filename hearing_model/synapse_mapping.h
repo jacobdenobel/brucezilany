@@ -58,17 +58,15 @@ namespace synapse_mapping
 	 *
 	 * @param ihc_output the output of the inner hair cell model
 	 * @param spontaneous_firing_rate the spontaneous firing rate
-	 * @param cf the characteristic frequency
-	 * @param sampling_frequency the sampling frequency
-	 * @param time_resolution the time resolution of the model (step/bin size)
+	 * @param characteristic_frequency the characteristic frequency
+	 * @param time_resolution the time resolution of the input
 	 * @param mapping_function Type of mapping function to be used
 	 * @return transformed inner hair cell output
 	 */
 	std::vector<double> map(
 		const std::vector<double>& ihc_output,
 		double spontaneous_firing_rate,
-		double cf,
-		double sampling_frequency,
+		double characteristic_frequency,
 		double time_resolution,
 		SynapseMapping mapping_function
 	);

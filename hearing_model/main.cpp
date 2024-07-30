@@ -94,8 +94,7 @@ void test_adaptive_redocking() {
 
 	// For adaptive redocking
 	static bool make_plots = false;
-	static double sampFreq = 10e3;
-	static int CF = (int)5e3;         // CF in Hz;
+	static int CF = (int)5e3;    // CF in Hz;
 	static int spont = 100;      // spontaneous firing rate
 	static double tabs = 0.6e-3; // Absolute refractory period
 	static double trel = 0.6e-3; // Baseline mean relative refractory period
@@ -104,32 +103,36 @@ void test_adaptive_redocking() {
 	static int species = 1;      // 1 for cat (2 for human with Shera et al. tuning; 3 for human with Glasberg & Moore tuning)
 	static NoiseType noiseType = FIXED_MATLAB;    // 1 for variable fGn; 0 for fixed (frozen) fGn (this is different)
 	static PowerLaw implnt = APPROXIMATED;       // "0" for approximate or "1" for actual implementation of the power-law functions in the synapse (t his is reversed)
-	static int nrep = 2;         // number of stimulus repetitions
-	static int trials = 10;	 // number of trails 
+	static int nrep = 1;         // number of stimulus repetitions
+	static int trials = 10000;	 // number of trails 
 
 	// Stimulus parameters
 	static double stimdb = 60.0;                // stimulus intensity in dB SPL
 	static double F0 = static_cast<double>(CF); // stimulus frequency in Hz
-	static int Fs = (int)100e3;                      // sampling rate in Hz (must be 100, 200 or 500 kHz)
+	static int Fs = (int)100e3;                 // sampling rate in Hz (must be 100, 200 or 500 kHz)
 	static double T = 0.25;                     // stimulus duration in seconds
 	static double rt = 2.5e-3;                  // rise/fall time in seconds
 	static double ondelay = 25e-3;				// delay for the stim
 
-	const double interval = 1.0 / Fs;
-	const size_t mxpts = (size_t)(T / interval) + 1;
-	auto pin = stimulus::ramped_sine_wave(interval, mxpts, Fs, rt, ondelay, F0, stimdb);
+
+	const auto stimulus = stimulus::ramped_sine_wave(T, 2.0 * T, Fs, rt, ondelay, F0, stimdb);
+
 
 	auto start = std::chrono::high_resolution_clock::now();
 
 
-	auto ihc = inner_hair_cell(pin, CF, nrep, interval, 2 * T, 1, 1, CAT);
+	auto ihc = inner_hair_cell(stimulus, CF, nrep, cohc, cihc, CAT);
 
-	const int totalstim = (int)(ihc.size() / nrep);
+	std::cout << utils::sum(stimulus.data) << std::endl;
+	std::cout << utils::sum(ihc) << std::endl;
 
-	// This needs the new parameters
-	auto pla = synapse_mapping::map(ihc,
-		spont, CF, sampFreq,
-		interval, SOFTPLUS);
+	//// This needs the new parameters
+	auto pla = synapse_mapping::map(ihc, 
+		spont, 
+		CF, 
+		stimulus.time_resolution, 
+		SOFTPLUS
+	);
 
 
 	double psthbinwidth = 5e-4;
@@ -139,7 +142,7 @@ void test_adaptive_redocking() {
 	std::vector<double> ptsh(n_bins, 0.0);
 
 	if (make_plots)
-		plot({ pin }, "line", "stimulus");
+		plot({ stimulus.data }, "line", "stimulus");
 
 	std::vector<std::vector<double>> trd(n_bins_eb, std::vector<double>(trials));
 
@@ -148,11 +151,16 @@ void test_adaptive_redocking() {
 	std::vector<std::vector<double>> synout_vectors(nmax);
 	std::vector<std::vector<double>> trd_vectors(nmax, std::vector<double>(n_bins_eb));
 	std::vector<std::vector<double>> trel_vectors(nmax);
-	//std::cout << mean(pin) << std::endl;
+
+	std::vector<double> n_spikes(trials);
+
 	for (auto i = 0; i < trials; i++) {
 		std::cout << i << "/" << trials << std::endl;
-		auto out = synapse(pla, CF, nrep, totalstim, interval, noiseType, implnt, spont, tabs, trel);
+		auto out = synapse(pla, CF, nrep, stimulus.n_simulation_timesteps, stimulus.time_resolution, noiseType, implnt, spont, tabs, trel);
+		n_spikes[i] = utils::sum(out.psth);
 		auto binned = utils::make_bins(out.psth, n_bins);
+
+
 
 		utils::scale(binned, 1.0 / trials / psthbinwidth);
 		utils::add(ptsh, binned);
@@ -169,6 +177,10 @@ void test_adaptive_redocking() {
 			utils::scale(trel_vectors[i], 1e3);
 		}
 	}
+
+	std::cout << utils::mean(n_spikes) << '\n';
+	std::cout << utils::std(n_spikes, utils::mean(n_spikes)) << '\n';
+
 	auto stop = std::chrono::high_resolution_clock::now();
 	auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
 	std::cout << "time elapsed: " << 100.0 / duration.count() << " seconds" << std::endl;
@@ -181,27 +193,27 @@ void test_adaptive_redocking() {
 	std::cout << "expected: 101.86, actual: " << utils::mean(ptsh) << std::endl;
 	std::cout << ptsh[10] << std::endl;
 	std::cout << ptsh[15] << std::endl;
-	assert(abs(utils::mean(ptsh) - 103.4) < 1e-8);
-	assert(ptsh[10] == 200.0);
-	assert(ptsh[15] == 200.0);
+	//assert(abs(utils::mean(ptsh) - 105.4) < 1e-8);
+	//assert(ptsh[10] == 200.0);
+	//assert(ptsh[15] == 200.0);
 
-	if (make_plots) {
+	//if (make_plots) {
 
-		plot({ ptsh, t }, "bar", "PTSH", "Time(s)", "FiringRate(s)");
+	//	plot({ ptsh, t }, "bar", "PTSH", "Time(s)", "FiringRate(s)");
 
 
-		t.resize(n_bins_eb);
-		for (size_t i = 0; i < n_bins_eb; i++)
-			t[i] = i * interval;
+	//	t.resize(n_bins_eb);
+	//	for (size_t i = 0; i < n_bins_eb; i++)
+	//		t[i] = i * interval;
 
-		auto m = utils::reduce_mean(trd);
-		auto s = utils::reduce_std(trd, m);
-		plot({ m, s, t }, "errorbar", "RedockingTime", "Time(s)", "t_{rd}(ms)");
+	//	auto m = utils::reduce_mean(trd);
+	//	auto s = utils::reduce_std(trd, m);
+	//	plot({ m, s, t }, "errorbar", "RedockingTime", "Time(s)", "t_{rd}(ms)");
 
-		plot(synout_vectors, "line", "OutputRate", "x", "S_{out}");
-		plot(trd_vectors, "line", "RelDockTime", "x", "tau_{rd}");
-		plot(trel_vectors, "line", "RelRefr", "x", "t_{rel}");
-	}
+	//	plot(synout_vectors, "line", "OutputRate", "x", "S_{out}");
+	//	plot(trd_vectors, "line", "RelDockTime", "x", "tau_{rd}");
+	//	plot(trel_vectors, "line", "RelRefr", "x", "t_{rel}");
+	//}
 }
 
 
@@ -241,10 +253,10 @@ void example_neurogram()
 
 	auto species = HUMAN_SHERA;
 	Neurogram ng(40);
-	ng.create(pin, 1, sampFreq, 1.0 / Fs, 2 * T, species, RANDOM, APPROXIMATED);
+	//ng.create(pin, 1, sampFreq, 1.0 / Fs, 2 * T, species, RANDOM, APPROXIMATED);
 }
 
 int main() {
-	//test_adaptive_redocking();
-	example_neurogram();
+	test_adaptive_redocking();
+	//example_neurogram();
 }

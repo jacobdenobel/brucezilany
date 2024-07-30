@@ -153,6 +153,7 @@
     <ClCompile Include="synapse_mapping.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="AudioFile.h" />
     <ClInclude Include="bruce2018.h" />
     <ClInclude Include="inner_hair_cell.h" />
     <ClInclude Include="neurogram.h" />

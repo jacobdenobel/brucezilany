@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "types.h"
+#include "stimulus.h"
 
 namespace ihc
 {
@@ -160,11 +161,9 @@ namespace ihc
  * It is recommended to create the model at 100 kHz for CFs up to 20 kHz, and
  * at 200 kHz for CFs> 20 kHz to 40 kHz.
  *
- * @param sound_wave the input sound wave
+ * @param stimulus the input sound wave
  * @param cf characteristic frequency
  * @param n_rep the number of repetitions for the psth
- * @param time_resolution the binsize in seconds, i.e., the reciprocal of the sampling rate
- * @param rep_time the time duration of the competition
  * @param cohc is the OHC scaling factor: 1 is normal OHC function; 0 is complete OHC dysfunction
  * @param cihc is the IHC scaling factor: 1 is normal IHC function; 0 is complete IHC dysfunction
  * @param species is the model species: "1" for cat, "2" for human with BM tuning from Shera et al. (PNAS 2002),
@@ -172,11 +171,9 @@ namespace ihc
  * @returns 
  */
 std::vector<double> inner_hair_cell(
-	const std::vector<double>& sound_wave,
+	const stimulus::Stimulus& stimulus,
 	double cf = 1e3,
 	int n_rep = 10,
-	double time_resolution = 1 / 100e3, // binsize in seconds, recprocal of sampling rate
-	double rep_time = 0.2, // repetition duration
 	double cohc = 1,
 	double cihc = 1,
 	Species species = HUMAN_SHERA

@@ -247,6 +247,10 @@ namespace utils
 			x[i] *= y;
 	}
 
+	double sum(const std::vector<double>& x) {
+		return std::accumulate(x.begin(), x.end(), 0.0);
+	}
+
 	double variance(const std::vector<double>& x, const double m) {
 		double var = 0.0;
 		for (const auto& xi : x)
@@ -259,8 +263,9 @@ namespace utils
 	}
 
 	double mean(const std::vector<double>& x) {
-		return std::accumulate(x.begin(), x.end(), 0.0) / x.size();
+		return sum(x) / static_cast<double>(x.size());
 	}
+
 
 	std::vector<double> reduce_mean(const std::vector<std::vector<double>>& x) {
 		std::vector<double> y(x.size());

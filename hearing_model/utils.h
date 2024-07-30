@@ -119,6 +119,13 @@ namespace utils
 	void scale(std::vector<double>& x, double y);
 
 	/**
+	 * Compute the sum of a vector x
+	 * @param x the vector
+	 * @return the mean
+	 */
+	double sum(const std::vector<double>& x);
+
+	/**
 	 * Compute the (sample) variance of a vector x
 	 * @param x the vector
 	 * @param m the mean of the vector
@@ -142,7 +149,6 @@ namespace utils
 	 * @return the mean 
 	 */
 	double mean(const std::vector<double>& x);
-
 
 	/**
 	 * Reduce a 2d vector to a 1d vector of means

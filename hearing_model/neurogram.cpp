@@ -84,7 +84,7 @@ void Neurogram::evaluate_fiber(
 	const Fiber& fiber
 )
 {
-	const auto pla = synapse_mapping::map(ihc,
+	/*const auto pla = synapse_mapping::map(ihc,
 	                                      fiber.spont,
 	                                      cfs_[cf_i],
 	                                      sampling_freq,
@@ -103,7 +103,7 @@ void Neurogram::evaluate_fiber(
 	);
 	mutex_.lock();
 	utils::add(fine_timing_[cf_i], utils::filter(smw_ft, out.psth));
-	mutex_.unlock();
+	mutex_.unlock();*/
 }
 
 
@@ -123,7 +123,7 @@ void Neurogram::evaluate_cf(
 {
 	const auto fibers = get_fibers(cf_i);
 
-	const auto ihc = inner_hair_cell(
+	/*const auto ihc = inner_hair_cell(
 		sound_wave, cfs_[cf_i], n_rep, time_resolution, rep_time, coh_cs_[cf_i], ihc_cs_[cf_i], species
 	);
 
@@ -137,7 +137,7 @@ void Neurogram::evaluate_cf(
 	}
 
 	for (auto& th : threads)
-		th.join();
+		th.join();*/
 
 	std::cout << cf_i << '\n';
 }

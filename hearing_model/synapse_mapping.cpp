@@ -60,19 +60,19 @@ namespace synapse_mapping
 	std::vector<double> map(
 		const std::vector<double>& ihc_output,
 		const double spontaneous_firing_rate,
-		const double cf,
-		const double sampling_frequency,
+		const double characteristic_frequency,
 		const double time_resolution,
 		const SynapseMapping mapping_function
 	)
 	{
+		constexpr static double sampling_frequency = 10e3;
 		const double cf_slope = pow(spontaneous_firing_rate, 0.19) * pow(10, -0.87);
 		const double cf_const = 0.1 * pow(log10(spontaneous_firing_rate), 2) + 0.56 * log10(spontaneous_firing_rate) - 0.84;
 		const double cf_sat = pow(10, (cf_slope * 8965.5 / 1e3 + cf_const));
-		const double cf_factor = std::min(cf_sat, pow(10, cf_slope * cf / 1e3 + cf_const)) * 2.0;
-		const double mul_factor = std::max(2.95 * std::max(1.0, 1.5 - spontaneous_firing_rate / 100), 4.3 - 0.2 * cf / 1e3);
+		const double cf_factor = std::min(cf_sat, pow(10, cf_slope * characteristic_frequency / 1e3 + cf_const)) * 2.0;
+		const double mul_factor = std::max(2.95 * std::max(1.0, 1.5 - spontaneous_firing_rate / 100), 4.3 - 0.2 * characteristic_frequency / 1e3);
 		const size_t n_total_timesteps = ihc_output.size();
-		const size_t delay_point = static_cast<size_t>(floor(7500 / (cf / 1e3)));
+		const size_t delay_point = static_cast<size_t>(floor(7500 / (characteristic_frequency / 1e3)));
 
 		std::vector<double> output_signal(n_total_timesteps + 3 * delay_point);
 		const auto mapper = get_function(mapping_function);
