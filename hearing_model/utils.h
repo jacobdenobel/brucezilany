@@ -203,4 +203,47 @@ namespace utils
 	 * @return the filtered signal.
 	 */
 	std::vector<double> filter(const std::vector<double>& coefficients, const std::vector<double>& signal);
+
+	/**
+	 * Plotting function (requires local python setup)
+	 * @param vectors data to plot
+	 * @param ptype type of plot
+	 * @param title the title
+	 * @param xlabel the xlabel
+	 * @param ylabel the ylabel
+	 * @param detach whether to detach from the python proc, if false, execution is paused. 
+	 */
+	void plot(
+		std::vector<std::vector<double>> vectors,
+		const std::string& ptype = "line",
+		const std::string& title = "title",
+		const std::string& xlabel = "x",
+		const std::string& ylabel = "y",
+		const std::string& extra = "",
+		bool detach = true
+	);
+
+	/**
+	 * Get a subsequence of a vector
+	 * @tparam T the type of the vector
+	 * @param input the input vector
+	 * @param start the starting position
+	 * @param stop the ending [position
+	 * @param step the step interval
+	 * @return 
+	 */
+	template<typename T>
+	std::vector<T> subsequence(const std::vector<T>& input, const size_t start, const size_t stop, const size_t step)
+	{
+		std::vector<T> result;
+
+		if (!input.empty() && step > 0) 
+			result.reserve((stop - start + step - 1) / step);
+
+		for (size_t i = start + step - 1; i < stop; i += step) {
+			result.push_back(input[i]);
+		}
+		return result;
+	}
+
 }

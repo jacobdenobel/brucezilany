@@ -24,7 +24,7 @@ namespace syn
 		SynapseOutput(const int n_rep, const int n_timesteps) :
 			n_rep(n_rep),
 			n_timesteps(n_timesteps),
-			n_total_timesteps(n_rep* n_timesteps),
+			n_total_timesteps(n_rep * n_timesteps),
 			psth(n_timesteps),
 			synaptic_output(n_total_timesteps),
 			redocking_time(n_total_timesteps)
@@ -127,7 +127,7 @@ syn::SynapseOutput synapse(
 	const std::vector<double>& amplitude_ihc, // px
 	double cf,
 	int n_rep,
-	int n_timesteps,
+	size_t n_timesteps,
 	double time_resolution = 1 / 100e3, // time_resolution in seconds, reciprocal of sampling rate
 	NoiseType noise = RANDOM,
 	PowerLaw pla_impl = APPROXIMATED, 

@@ -1,6 +1,8 @@
 #include "resample.h"
 #include "synapse_mapping.h"
 
+#include "utils.h"
+
 using SynapseMappingFunction = std::function<double(double)>;
 
 namespace synapse_mapping
@@ -83,8 +85,10 @@ namespace synapse_mapping
 		for (size_t k = 0; k < delay_point; k++)
 			output_signal[k] = output_signal[delay_point];
 
+		// TODO: ask Bruce at some point whether this should output_signal[k-1] or output_signal[delay_point]
 		for (size_t k = n_total_timesteps + delay_point; k < n_total_timesteps + 3 * delay_point; k++)
-			output_signal[k] = output_signal[k - 1] + 3.0 * spontaneous_firing_rate;
+			output_signal[k] = output_signal[n_total_timesteps + delay_point]; // I think this is correct
+			//output_signal[k] = output_signal[k-1] + 3.0 * spontaneous_firing_rate;
 
 		const int down_factor = static_cast<int>(ceil(1 / (time_resolution * sampling_frequency)));
 		return resample(1, down_factor, output_signal);

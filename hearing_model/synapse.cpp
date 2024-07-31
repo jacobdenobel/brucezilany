@@ -266,7 +266,7 @@ syn::SynapseOutput synapse(
 	const std::vector<double>& amplitude_ihc, // resampled power law mapping of ihc output, see map_to_synapse
 	const double cf,
 	const int n_rep,
-	const int n_timesteps,
+	const size_t n_timesteps,
 	const double time_resolution, // tdres
 	const NoiseType noise, // NoiseType
 	const PowerLaw pla_impl, // implnt
@@ -281,7 +281,7 @@ syn::SynapseOutput synapse(
 	utils::validate_parameter(abs_refractory_period, 0., 20e-3, "abs_refractory_period");
 	utils::validate_parameter(rel_refractory_period, 0., 20e-3, "rel_refractory_period");
 
-	auto res = syn::SynapseOutput(n_rep, n_timesteps);
+	auto res = syn::SynapseOutput(n_rep, static_cast<int>(n_timesteps));
 
 	///*====== Run the synapse model ======*/
 	constexpr double sampling_frequency = 10e3 /* Sampling frequency used in the synapse */;

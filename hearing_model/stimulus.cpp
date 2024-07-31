@@ -1,4 +1,6 @@
 #include "stimulus.h"
+#include "AudioFile.h"
+#include "resample.h"
 
 
 namespace stimulus
@@ -37,7 +39,7 @@ namespace stimulus
 		return stim;
 	}
 
-	Stimulus& normalize_db(Stimulus& stim)
+	Stimulus normalize_db(Stimulus& stim)
 	{
 		constexpr double stim_db = 65;
 
@@ -51,14 +53,21 @@ namespace stimulus
 		return stim;
 	};
 
+	Stimulus from_file(const std::string& path)
+	{
+		std::cout << "loading file: " << path << "\n";
+		const AudioFile<double> audio_file(path);
+		audio_file.printSummary();
+		// Assuming single channel
+		assert(audio_file.samples.size() == 1);
 
-	//Stimulus read_stimulus(const std::string path)
-	//{
-	//	//[stim, Fs_stim] = audioread('defineit.wav');
-	//	// stimdb = 65;% speech level in dB SPL
-	//	// stim = stim / rms(stim) * 20e-6 * 10 ^ (stimdb / 20);*/
-	//	/*Stimulus s;
-	//	s = normalize_db(s);
-	//	return s;*/
-	//};
+		constexpr int required_sample_rate = 100e3;
+		const auto sample_rate = audio_file.getSampleRate();
+		std::vector<double> data = audio_file.samples[0];
+		data = resample(required_sample_rate, sample_rate,data);
+
+		const auto stim_duration = static_cast<double>(data.size()) * 1.0 / required_sample_rate;
+		auto stim = Stimulus(data, required_sample_rate, 1.2 * stim_duration);
+		return normalize_db(stim);
+	}
 }

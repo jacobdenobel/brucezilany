@@ -1,5 +1,6 @@
 #pragma once
 
+#include "AudioFile.h"
 #include "utils.h"
 
 namespace stimulus
@@ -36,7 +37,10 @@ namespace stimulus
 			n_simulation_timesteps(static_cast<size_t>(std::ceil(simulation_duration / time_resolution)))
 		{
 		}
+		
 	};
+
+	Stimulus from_file(const std::string& path);
 
 	Stimulus ramped_sine_wave(
 		double duration,
@@ -48,7 +52,6 @@ namespace stimulus
 		double db
 	);
 
-	Stimulus& normalize_db(Stimulus& stim);
+	Stimulus normalize_db(Stimulus& stim);
 
-	//Stimulus read_stimulus(std::string path);/**/
 }

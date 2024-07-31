@@ -40,6 +40,29 @@ def plot_bar(h, t=None):
     plt.bar(t, m, width=dt*1.5)
   
             
+def plot_colormesh(dt, *files):
+    *files, cf_file = files
+    cfs = get_array(cf_file)
+    dt = float(dt)
+    data = np.vstack([get_array(f) for f in files])
+    t = np.arange(data[0].shape[0]) * dt
+    plt.figure(figsize=(15, 8))
+    plt.pcolor(t, cfs / 1e3, data, cmap="viridis", vmin=0, vmax=data.max())
+    plt.yscale("log")
+    plt.colorbar()
+    
+
+def plot_specgram(dt, *files):
+    *files, cf_file = files
+    cfs = get_array(cf_file)
+    dt = float(dt)
+    data = np.vstack([get_array(f) for f in files])
+    t = np.arange(data[0].shape[0]) * dt
+    plt.figure(figsize=(15, 8))
+    plt.pcolormesh(t, cfs, np.log10(data), cmap="nipy_spectral", vmin=0, vmax=data.max())
+    plt.colorbar()
+    
+    
 
 if __name__ == "__main__":
     ptype = sys.argv[1]
@@ -53,13 +76,20 @@ if __name__ == "__main__":
     if ptype == "line":
         plot_lines(sys.argv[5:])
 
-    elif ptype == 'errorbar':
+    elif ptype == "errorbar":
         plot_errorbar(*sys.argv[5:])
-
+        
+    elif ptype == "colormesh":
+        plot_colormesh(*sys.argv[5:])
+        
+    elif ptype == "specgram":
+        plot_specgram(*sys.argv[5:])
+    
     plt.title(title)
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
     plt.grid()
     plt.show()
+    
     
         

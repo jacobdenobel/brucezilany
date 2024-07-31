@@ -1,3 +1,6 @@
+#include <filesystem>
+#include <fstream>
+
 #include "bruce2018.h"
 
 namespace
@@ -225,7 +228,7 @@ namespace utils
 		std::vector<double> res(n_bins, 0.0);
 
 		for (size_t i = 1; i < n_bins; i++)
-			res[i] = std::accumulate(x.begin() + (i - 1) * binsize, x.begin() + i * binsize, 0.0);
+			res[i] = std::accumulate(x.begin() + ( i - 1) * binsize, x.begin() + i * binsize, 0.0);
 		return res;
 	}
 
@@ -319,4 +322,34 @@ namespace utils
 
 		return output;
 	}
+
+	void plot(
+		std::vector<std::vector<double>> vectors,
+		const std::string& ptype,
+		const std::string& title,
+		const std::string& xlabel,
+		const std::string& ylabel,
+		const std::string& extra,
+		bool detach
+	) {
+		std::filesystem::path p = "C:\\Users\\Jacob\\source\\repos\\hearing_model";
+		const auto py = (p / "venv\\Scripts\\python.exe").generic_string();
+		const auto plot = (p / "plot.py").generic_string();
+		auto command = (detach ? "start " : "") + "py "s + plot + " " + ptype + " " + title + " " + xlabel + " " + ylabel + " " + extra;
+
+		for (auto i = 0; i < vectors.size(); i++) {
+			auto path = (title + std::to_string(i) + ".txt");
+			std::ofstream out;
+			out.open(path);
+
+			for (auto xi : vectors[i])
+				out << xi << ' ';
+			out.close();
+			command += " " + path;
+		}
+
+		std::cout << command << std::endl;
+		system(command.c_str());
+	}
+
 }

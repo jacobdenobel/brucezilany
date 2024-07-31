@@ -7,6 +7,7 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "hearing_model", "hearing_mo
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{DC30E9C5-3603-4734-9510-D94C85F43F18}"
 	ProjectSection(SolutionItems) = preProject
+		defineit.wav = defineit.wav
 		plot.py = plot.py
 		pyproject.toml = pyproject.toml
 		setup.py = setup.py
