@@ -162,16 +162,16 @@ void plot_neurogram(const stimulus::Stimulus& stim)
 {
 	Neurogram ng(40);
 	ng.create(stim, 1, HUMAN_SHERA, RANDOM, APPROXIMATED);
-	auto plot_data = ng.get_fine_timing();
+	auto [plot_data, dt_fine_timing] = ng.get_fine_timing();
 	plot_data.push_back(ng.get_cfs());
-	utils::plot(plot_data, "colormesh", "fine_timing", "time", "frequency",  std::to_string(16 * stim.time_resolution));
+	utils::plot(plot_data, "colormesh", "fine_timing", "time", "frequency",  std::to_string(dt_fine_timing));
 
-	auto plot_data2 = ng.get_mean_timing();
+	auto [plot_data2, dt_mean_timing] = ng.get_mean_timing();
 	plot_data2.push_back(ng.get_cfs());
-	utils::plot(plot_data2, "colormesh", "mean_timing", "time", "frequency", std::to_string(10 * 64 * stim.time_resolution));
+	utils::plot(plot_data2, "colormesh", "mean_timing", "time", "frequency", std::to_string(dt_mean_timing));
 }
 
-void example_neurogram()
+void example_neurogram_sin()
 {
 	constexpr static int cf = 5e3;					// Characteristic frequency
 	constexpr static double stim_db = 60.0;			// stimulus intensity in dB SPL
@@ -182,15 +182,16 @@ void example_neurogram()
 	constexpr static double delay = 25e-3;			// delay for the stim
 
 	const auto stim = stimulus::ramped_sine_wave(T, 1.2 * (T + delay), fs, rt, delay, f0, stim_db);
-	std::cout << stim.data.size() << '\n';
-	//plot_neurogram(stim);
+	plot_neurogram(stim);
+}
+
+void example_neurogram()
+{
+	const auto stim = stimulus::from_file("C:\\Users\\Jacob\\source\\repos\\hearing_model\\defineit.wav");
+	plot_neurogram(stim);
 }
 
 int main() {
 	//test_adaptive_redocking();
-	example_neurogram();
-
-	const auto stim = stimulus::from_file("C:\\Users\\Jacob\\source\\repos\\hearing_model\\defineit.wav");
-	std::cout << stim.data.size();
-	plot_neurogram(stim);
+	example_neurogram_sin();
 }

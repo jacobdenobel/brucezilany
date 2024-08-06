@@ -46,7 +46,7 @@ def plot_colormesh(dt, *files):
     dt = float(dt)
     data = np.vstack([get_array(f) for f in files])
     t = np.arange(data[0].shape[0]) * dt
-    plt.figure(figsize=(15, 8))
+    plt.figure(figsize=(9, 4))
     plt.pcolor(t, cfs / 1e3, data, cmap="viridis", vmin=0, vmax=data.max())
     plt.yscale("log")
     plt.colorbar()

@@ -36,6 +36,8 @@ class Neurogram
 
 	std::vector<double> hamming_window_ft_;
 	std::vector<double> hamming_window_mr_;
+	double dt_fine_timing_;
+	double dt_mean_timing_;
 
 public:
 	explicit Neurogram(size_t n_cf = 40);
@@ -78,14 +80,14 @@ public:
 		size_t cf_i
 	);
 
-	[[nodiscard]] std::vector<std::vector<double>> get_fine_timing() const 
+	[[nodiscard]] std::pair<std::vector<std::vector<double>>, double> get_fine_timing() const 
 	{
-		return fine_timing_;
+		return { fine_timing_, dt_fine_timing_ };
 	}
 
-	[[nodiscard]] std::vector<std::vector<double>> get_mean_timing() const
+	[[nodiscard]] std::pair<std::vector<std::vector<double>>, double> get_mean_timing() const
 	{
-		return mean_timing_;
+		return { mean_timing_, dt_mean_timing_ };
 	}
 
 	[[nodiscard]] std::vector<double> get_cfs() const

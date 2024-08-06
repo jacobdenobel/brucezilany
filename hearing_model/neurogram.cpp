@@ -138,16 +138,12 @@ void Neurogram::evaluate_cf(
 
 	std::vector<std::thread> threads(fibers.size());
 	for (size_t f_id = 0; f_id < fibers.size(); f_id++)
-	{
 		threads[f_id] = std::thread(
 			&Neurogram::evaluate_fiber, this, sound_wave, ihc, n_rep, noise_type, power_law, fibers[f_id], cf_i
 		);
-	}
 
 	for (auto& th : threads)
 		th.join();
-
-	std::cout << cf_i << '\n';
 }
 
 
@@ -164,25 +160,24 @@ void Neurogram::create(
 
 	fine_timing_ = std::vector(cfs_.size(), std::vector(sound_wave.n_simulation_timesteps, 0.0));
 	mean_timing_ = std::vector(cfs_.size(), std::vector(n_bins, 0.0));
-
+	dt_fine_timing_ = static_cast<double>(hamming_window_ft_.size()) / 2.0 * sound_wave.time_resolution;
+	dt_mean_timing_ = static_cast<double>(hamming_window_mr_.size()) / 2.0 * sound_wave.time_resolution * mr_bin_width / sound_wave.time_resolution;
 
 	std::vector<std::thread> threads(cfs_.size());
 	for (size_t cf_i = 0; cf_i < cfs_.size(); cf_i++)
-	{
 		threads[cf_i] = std::thread(
 			&Neurogram::evaluate_cf, this, sound_wave, n_rep, species, noise_type, power_law, cf_i
 		);
-	}
 
 	for (auto& th : threads)
 		th.join();
 
 	// Resample
 	for (auto& xc : fine_timing_)
-		xc = utils::subsequence(xc, 0, xc.size(), 16);
+		xc = utils::subsequence(xc, 0, xc.size(), hamming_window_ft_.size() / 2);
 
 	for (auto& xc : mean_timing_)
-		xc = utils::subsequence(xc, 0, xc.size(), 64);
+		xc = utils::subsequence(xc, 0, xc.size(), hamming_window_mr_.size() / 2);
 
 }
 
