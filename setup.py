@@ -34,4 +34,5 @@ setup(
     packages=["bruce"],
     zip_safe=False,
     version=__version__,
+    install_requires=["numpy>=1.19.2"],
 )
