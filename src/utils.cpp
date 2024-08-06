@@ -1,7 +1,7 @@
 #include <filesystem>
 #include <fstream>
-
-#include "bruce2018.h"
+#include "utils.h"
+#include "resample.h"
 
 namespace
 {
@@ -17,15 +17,15 @@ namespace
 			std::valarray<std::complex<double>> fft_data(n_fft);
 			z_mag.resize(n_fft);
 
-
 			std::generate(std::begin(fft_data), std::end(fft_data),
-				[n_fft_half, n = 0, reverse = false]() mutable
-				{
-					if (n + 1 > n_fft_half) reverse = true;
-					const double k = !reverse ? n++ : n--;
-					return 0.5 * (pow(k + 1, 2. * 0.9) - (2.0 * pow(k, 2.0 * 0.9)) +
-						pow(abs(k - 1), 2. * 0.9));
-				});
+						  [n_fft_half, n = 0, reverse = false]() mutable
+						  {
+							  if (n + 1 > n_fft_half)
+								  reverse = true;
+							  const double k = !reverse ? n++ : n--;
+							  return 0.5 * (pow(k + 1, 2. * 0.9) - (2.0 * pow(k, 2.0 * 0.9)) +
+											pow(abs(k - 1), 2. * 0.9));
+						  });
 
 			utils::fft(fft_data);
 			for (size_t i = 0; i < z_mag.size(); ++i)
@@ -40,14 +40,14 @@ namespace
 		return z_mag;
 	}
 
-	void fill_gaussian(std::vector<double>& x)
+	void fill_gaussian(std::vector<double> &x)
 	{
 		static std::normal_distribution<double> d(0, 1.0);
-		for (auto& xi : x)
+		for (auto &xi : x)
 			xi = d(utils::GENERATOR);
 	}
 
-	void fill_noise_vectors(std::vector<double>& zr1, std::vector<double>& zr2, const NoiseType noise)
+	void fill_noise_vectors(std::vector<double> &zr1, std::vector<double> &zr2, const NoiseType noise)
 	{
 		switch (noise)
 		{
@@ -64,8 +64,7 @@ namespace
 				-0.504687908175280, 0.919640621536610, -0.234470350850954, 0.530697743839911,
 				0.660825091280324, 0.855468294638247, -0.994629072636940, -2.231455213644026,
 				0.318559022665053, 0.632957296094154, -0.151148210794462, -0.816060813871062,
-				-1.014897009384865, 0.518977711821625, -0.059474326486106, 0.731639398082223
-			};
+				-1.014897009384865, 0.518977711821625, -0.059474326486106, 0.731639398082223};
 			zr2 = {
 				-0.638409626955796, -0.061701505688751, -0.218192062027145, 0.203235982652021,
 				-0.098642410359283, 0.945333174032015, -0.801457072154293, -0.085099820744463,
@@ -74,8 +73,7 @@ namespace
 				-0.702699919458338, -0.283874347267996, 0.450432043543390, -0.259699095922555,
 				0.409258053752079, 1.926425247717760, -0.945190729563938, -0.854589093975853,
 				-0.219510861979715, 0.449824239893538, 0.257557798875416, 0.212844513926846,
-				-0.087690563274934, 0.231624682299529, -0.563183338456413, -1.188876899529859
-			};
+				-0.087690563274934, 0.231624682299529, -0.563183338456413, -1.188876899529859};
 			break;
 		case FIXED_SEED:
 			utils::GENERATOR.seed(42);
@@ -99,10 +97,10 @@ namespace utils
 	}
 
 	template <typename D>
-	std::vector<double> random(const size_t n, D& d)
+	std::vector<double> random(const size_t n, D &d)
 	{
 		std::vector<double> r(n);
-		for (auto& ri : r)
+		for (auto &ri : r)
 			ri = d(GENERATOR);
 		return r;
 	}
@@ -155,14 +153,14 @@ namespace utils
 		auto output_signal = resample(resample_factor, 1, y);
 		output_signal.resize(n_out);
 
-		const double sigma = mu < .2 ? 1.0 : mu < 20 ? 10 : mu / 2.0;
-		for (auto& yi : output_signal)
+		const double sigma = mu < .2 ? 1.0 : mu < 20 ? 10
+													 : mu / 2.0;
+		for (auto &yi : output_signal)
 			yi *= sigma;
 		return output_signal;
 	}
 
-
-	void fft(std::valarray<std::complex<double>>& x)
+	void fft(std::valarray<std::complex<double>> &x)
 	{
 		// DFT
 		size_t k = x.size();
@@ -207,7 +205,7 @@ namespace utils
 	}
 
 	// inverse fft (in-place)
-	void ifft(std::valarray<std::complex<double>>& x)
+	void ifft(std::valarray<std::complex<double>> &x)
 	{
 		// conjugate the complex numbers
 		x = x.apply(std::conj);
@@ -222,17 +220,18 @@ namespace utils
 		x /= static_cast<double>(x.size());
 	}
 
-
-	std::vector<double> make_bins(const std::vector<double>& x, const size_t n_bins) {
+	std::vector<double> make_bins(const std::vector<double> &x, const size_t n_bins)
+	{
 		const size_t binsize = x.size() / n_bins;
 		std::vector<double> res(n_bins, 0.0);
 
 		for (size_t i = 1; i < n_bins; i++)
-			res[i] = std::accumulate(x.begin() + ( i - 1) * binsize, x.begin() + i * binsize, 0.0);
+			res[i] = std::accumulate(x.begin() + (i - 1) * binsize, x.begin() + i * binsize, 0.0);
 		return res;
 	}
 
-	std::vector<double> cum_sum(const std::vector<double>& x) {
+	std::vector<double> cum_sum(const std::vector<double> &x)
+	{
 		std::vector<double> res(x.size());
 		res[0] = x[0];
 		for (size_t i = 1; i < x.size(); i++)
@@ -240,44 +239,50 @@ namespace utils
 		return res;
 	}
 
-	void add(std::vector<double>& x, const std::vector<double>& y) {
+	void add(std::vector<double> &x, const std::vector<double> &y)
+	{
 		for (size_t i = 0; i < x.size(); i++)
 			x[i] += y[i];
 	}
 
-	void scale(std::vector<double>& x, const double y) {
+	void scale(std::vector<double> &x, const double y)
+	{
 		for (size_t i = 0; i < x.size(); i++)
 			x[i] *= y;
 	}
 
-	double sum(const std::vector<double>& x) {
+	double sum(const std::vector<double> &x)
+	{
 		return std::accumulate(x.begin(), x.end(), 0.0);
 	}
 
-	double variance(const std::vector<double>& x, const double m) {
+	double variance(const std::vector<double> &x, const double m)
+	{
 		double var = 0.0;
-		for (const auto& xi : x)
+		for (const auto &xi : x)
 			var += (xi - m) * (xi - m);
 		return var / static_cast<double>(x.size());
-
 	}
-	double std(const std::vector<double>& x, const double m) {
+	double std(const std::vector<double> &x, const double m)
+	{
 		return std::sqrt(variance(x, m));
 	}
 
-	double mean(const std::vector<double>& x) {
+	double mean(const std::vector<double> &x)
+	{
 		return sum(x) / static_cast<double>(x.size());
 	}
 
-
-	std::vector<double> reduce_mean(const std::vector<std::vector<double>>& x) {
+	std::vector<double> reduce_mean(const std::vector<std::vector<double>> &x)
+	{
 		std::vector<double> y(x.size());
 		for (size_t i = 0; i < x.size(); i++)
 			y[i] = mean(x[i]);
 		return y;
 	}
 
-	std::vector<double> reduce_std(const std::vector<std::vector<double>>& x, const std::vector<double>& means) {
+	std::vector<double> reduce_std(const std::vector<std::vector<double>> &x, const std::vector<double> &means)
+	{
 		std::vector<double> y(x.size());
 		for (size_t i = 0; i < x.size(); i++)
 			y[i] = std(x[i], means[i]);
@@ -305,12 +310,13 @@ namespace utils
 		return window;
 	}
 
-	std::vector<double> filter(const std::vector<double>& coefficients, const std::vector<double>& signal)
+	std::vector<double> filter(const std::vector<double> &coefficients, const std::vector<double> &signal)
 	{
 		std::vector buffer(coefficients.size(), 0.0);
 		std::vector output(signal.size(), 0.0);
 
-		for (size_t i = 0; i < signal.size(); i++) {
+		for (size_t i = 0; i < signal.size(); i++)
+		{
 			for (size_t k = buffer.size() - 1; k > 0; --k)
 				buffer[k] = buffer[k - 1];
 
@@ -325,19 +331,42 @@ namespace utils
 
 	void plot(
 		std::vector<std::vector<double>> vectors,
-		const std::string& ptype,
-		const std::string& title,
-		const std::string& xlabel,
-		const std::string& ylabel,
-		const std::string& extra,
-		bool detach
-	) {
-		std::filesystem::path p = "C:\\Users\\Jacob\\source\\repos\\hearing_model";
-		const auto py = (p / "venv\\Scripts\\python.exe").generic_string();
-		const auto plot = (p / "plot.py").generic_string();
-		auto command = (detach ? "start " : "") + "py "s + plot + " " + ptype + " " + title + " " + xlabel + " " + ylabel + " " + extra;
+		const std::string &ptype,
+		const std::string &title,
+		const std::string &xlabel,
+		const std::string &ylabel,
+		const std::string &extra,
+		bool detach)
+	{
+		const std::filesystem::path p = PROJECT_ROOT;
 
-		for (auto i = 0; i < vectors.size(); i++) {
+		if (!std::filesystem::exists(p))
+		{
+			std::cout << PROJECT_ROOT << " is not a valid path\n";
+			return;
+		}
+		std::filesystem::path py;
+		std::string prefix = "";
+		std::string suffix = "";
+
+#if defined(_MSC_VER)
+		py = p / "venv\\Scripts\\python.exe";
+		prefix = detach ? "start " : "";
+#else
+		py = p / "venv/bin/python";
+		suffix = detach ? "&" : "";
+#endif
+		if(!std::filesystem::exists(py))
+		{
+			std::cout << "python executable not found at: " << py << "\n";
+			return;
+		}
+
+		const auto plot = (p / "scripts" / "plot.py").generic_string();
+		auto command = prefix + py.generic_string() +  " " + plot + " " + ptype + " " + title + " " + xlabel + " " + ylabel + " " + extra;
+
+		for (auto i = 0; i < vectors.size(); i++)
+		{
 			auto path = (title + std::to_string(i) + ".txt");
 			std::ofstream out;
 			out.open(path);
@@ -347,9 +376,10 @@ namespace utils
 			out.close();
 			command += " " + path;
 		}
-
+		command += " " + suffix;
 		std::cout << command << std::endl;
-		system(command.c_str());
+		int success = system(command.c_str());
+		std::cout << success << "\n";
 	}
 
 }

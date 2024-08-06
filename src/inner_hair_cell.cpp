@@ -36,7 +36,7 @@ namespace
 		case HUMAN_SHERA:
 			return pow((cf / 1000), 0.3) * 12.7 * 0.505 + 0.2085;
 		case HUMAN_GLASSBERG_MOORE:
-			__fallthrough;
+			[[fallthrough]];
 		default:
 			return cf / 24.7 / (4.37 * (cf / 1000) + 1) * 0.505 + 0.2085;
 		}

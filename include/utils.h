@@ -4,9 +4,15 @@
 #include <valarray>
 #include <vector>
 #include <iostream>
+#if defined(_MSC_VER) 
 #include <corecrt_math_defines.h>
+#endif
 #include <cmath>
 #include "types.h"
+
+#ifndef PROJECT_ROOT
+#define PROJECT_ROOT "project_root_not_defined"
+#endif
 
 namespace utils
 {
@@ -245,5 +251,4 @@ namespace utils
 		}
 		return result;
 	}
-
 }

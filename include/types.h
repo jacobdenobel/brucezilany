@@ -1,6 +1,5 @@
 ﻿#pragma once
 
-
 enum Species
 {
 	CAT = 1,
@@ -15,8 +14,6 @@ enum SynapseMapping
 	EXPONENTIAL = 2,
 	BOLTZMAN = 3
 };
-
-
 
 enum NoiseType
 {
