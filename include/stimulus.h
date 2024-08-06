@@ -1,6 +1,5 @@
 #pragma once
 
-#include <filesystem>
 #include "audiofile.h"
 #include "utils.h"
 
@@ -37,7 +36,7 @@ namespace stimulus
 		}
 	};
 
-	Stimulus from_file(const std::filesystem::path &path, bool verbose = true);
+	Stimulus from_file(const std::string &path, bool verbose = true);
 
 	Stimulus ramped_sine_wave(
 		double duration,
