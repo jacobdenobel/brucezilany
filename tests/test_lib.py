@@ -33,13 +33,10 @@ class TestCase(unittest.TestCase):
         mean_timing, dt_mean_time = ng.get_mean_timing()
         self.assertEqual(mean_timing.shape[0], 2)
         self.assertEqual(mean_timing.shape[1], int(stim.n_simulation_timesteps / 64 / 10))
-        # self.assertAlmostEqual(dt_mean_time, stim.time_resolution)
-
 
         binned_output = ng.get_unfiltered_output()
         self.assertEqual(binned_output.shape[0], 2)
         self.assertEqual(binned_output.shape[1], int(stim.n_simulation_timesteps / (ng.bin_width / stim.time_resolution)))
-        breakpoint()    
     
 
 if __name__ == "__main__":
