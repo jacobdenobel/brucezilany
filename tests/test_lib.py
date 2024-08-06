@@ -4,7 +4,6 @@ import unittest
 import bruce
 
 
-
 class TestCase(unittest.TestCase):
     def test_types(self):
         print(dir(bruce))
