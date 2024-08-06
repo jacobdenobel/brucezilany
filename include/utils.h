@@ -27,7 +27,7 @@ namespace utils
 	template <typename T>
 	void validate_parameter(const T p, const T lb, const T ub, const std::string& name = "")
 	{
-		if (p < lb or p > ub)
+		if (p < lb || p > ub)
 		{
 			std::ostringstream ss;
 			ss << name << "= " << p << " is out of bounds [" << lb << ", " << ub << "]";
