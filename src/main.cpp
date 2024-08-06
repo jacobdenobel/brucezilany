@@ -166,7 +166,7 @@ void example_neurogram_sin()
 void example_neurogram()
 {
 	std::filesystem::path root = PROJECT_ROOT;
-	const auto stim = stimulus::from_file(root / "data" / "defineit.wav");
+	const auto stim = stimulus::from_file(root / "data" / "defineit.wav", true);
 	plot_neurogram(stim);
 }
 

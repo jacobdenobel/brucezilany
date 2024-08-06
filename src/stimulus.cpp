@@ -48,7 +48,7 @@ namespace stimulus
 		return stim;
 	};
 
-	Stimulus from_file(const std::string &path, const bool verbose)
+	Stimulus from_file(const std::filesystem::path &path, const bool verbose)
 	{
 		if (verbose)
 			std::cout << "loading file: " << path << "\n";

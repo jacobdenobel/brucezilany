@@ -9,7 +9,10 @@ from pybind11.setup_helpers import Pybind11Extension, build_ext
 __version__ = "0.0.1"
 
 ext = Pybind11Extension(
-    "bruce.brucecpp", glob("src/*cpp"), include_dirs=["include"], cxx_std=17
+    "bruce.brucecpp", 
+    [x for x in glob("src/*cpp") if "main.cpp" not in x], 
+    include_dirs=["include"],
+    cxx_std=17
 )
 
 if platform.system() in ("Linux", "Darwin"):
