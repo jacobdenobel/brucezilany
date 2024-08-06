@@ -1,6 +1,6 @@
 #pragma once
 
-#include "AudioFile.h"
+#include "audiofile.h"
 #include "utils.h"
 
 namespace stimulus
@@ -22,25 +22,21 @@ namespace stimulus
 		//! number of simulation timesteps (rep time)
 		size_t n_simulation_timesteps;
 
-
 		Stimulus(
-			const std::vector<double>& data,
+			const std::vector<double> &data,
 			const size_t sampling_rate,
-			const double simulation_duration
-		) :
-			data(data),
-			sampling_rate(sampling_rate),
-			time_resolution(1.0 / static_cast<double>(sampling_rate)),
-			stimulus_duration(static_cast<double>(data.size()) * time_resolution),
-			simulation_duration(simulation_duration),
-			n_stimulation_timesteps(data.size()),
-			n_simulation_timesteps(static_cast<size_t>(std::ceil(simulation_duration / time_resolution)))
+			const double simulation_duration) : data(data),
+												sampling_rate(sampling_rate),
+												time_resolution(1.0 / static_cast<double>(sampling_rate)),
+												stimulus_duration(static_cast<double>(data.size()) * time_resolution),
+												simulation_duration(simulation_duration),
+												n_stimulation_timesteps(data.size()),
+												n_simulation_timesteps(static_cast<size_t>(std::ceil(simulation_duration / time_resolution)))
 		{
 		}
-		
 	};
 
-	Stimulus from_file(const std::string& path);
+	Stimulus from_file(const std::string &path, bool verbose = true);
 
 	Stimulus ramped_sine_wave(
 		double duration,
@@ -49,9 +45,7 @@ namespace stimulus
 		double rt,
 		double delay,
 		double f0,
-		double db
-	);
+		double db);
 
-	Stimulus normalize_db(Stimulus& stim);
-
+	Stimulus normalize_db(Stimulus &stim, double stim_db = 65);
 }

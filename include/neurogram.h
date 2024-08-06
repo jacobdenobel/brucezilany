@@ -5,10 +5,11 @@
 #include "utils.h"
 #include "inner_hair_cell.h"
 
-
 enum FiberType
 {
-	LOW = 0, MEDIUM = 1, HIGH = 2
+	LOW = 0,
+	MEDIUM = 1,
+	HIGH = 2
 };
 
 struct Fiber
@@ -18,7 +19,6 @@ struct Fiber
 	double trel;
 	FiberType type;
 };
-
 
 class Neurogram
 {
@@ -30,6 +30,7 @@ class Neurogram
 
 	std::array<std::vector<Fiber>, 3> an_population_;
 
+	std::vector<std::vector<double>> unfiltered_output_;
 	std::vector<std::vector<double>> fine_timing_;
 	std::vector<std::vector<double>> mean_timing_;
 	std::mutex mutex_;
@@ -40,9 +41,29 @@ class Neurogram
 	double dt_mean_timing_;
 
 public:
-	explicit Neurogram(size_t n_cf = 40);
+	double bin_width = 5e-4;
 
-	static std::vector<Fiber> generate_fiber_set(size_t n_cf, size_t n_fibers, FiberType f_type, double c1, double c2, double lb, double ub);
+public:
+	explicit Neurogram(
+		const std::vector<double> &cfs,
+		size_t n_low = 10,
+		size_t n_med = 10,
+		size_t n_high = 30);
+
+	explicit Neurogram(
+		size_t n_cf = 40,
+		size_t n_low = 10,
+		size_t n_med = 10,
+		size_t n_high = 30);
+
+	static std::vector<Fiber> generate_fiber_set(
+		size_t n_cf,
+		size_t n_fibers,
+		FiberType f_type,
+		double c1,
+		double c2,
+		double lb,
+		double ub);
 
 	static std::array<std::vector<Fiber>, 3> generate_an_population(
 		size_t n_cf,
@@ -50,50 +71,49 @@ public:
 		size_t n_med,
 		size_t n_high);
 
-
 	[[nodiscard]] std::vector<Fiber> get_fibers(size_t cf_idx) const;
 
 	void create(
-		const stimulus::Stimulus& sound_wave,
+		const stimulus::Stimulus &sound_wave,
 		int n_rep,
 		Species species,
 		NoiseType noise_type,
-		PowerLaw power_law
-	);
+		PowerLaw power_law);
 
 	void evaluate_cf(
-		const stimulus::Stimulus& sound_wave,
+		const stimulus::Stimulus &sound_wave,
 		int n_rep,
 		Species species,
 		NoiseType noise_type,
 		PowerLaw power_law,
-		size_t cf_i
-	);
+		size_t cf_i);
 
 	void evaluate_fiber(
-		const stimulus::Stimulus& sound_wave,
-		const std::vector<double>& ihc,
+		const stimulus::Stimulus &sound_wave,
+		const std::vector<double> &ihc,
 		int n_rep,
 		NoiseType noise_type,
 		PowerLaw power_law,
-		const Fiber& fiber,
-		size_t cf_i
-	);
+		const Fiber &fiber,
+		size_t cf_i);
 
-	[[nodiscard]] std::pair<std::vector<std::vector<double>>, double> get_fine_timing() const 
+	[[nodiscard]] std::pair<std::vector<std::vector<double>>, double> get_fine_timing() const
 	{
-		return { fine_timing_, dt_fine_timing_ };
+		return {fine_timing_, dt_fine_timing_};
 	}
 
 	[[nodiscard]] std::pair<std::vector<std::vector<double>>, double> get_mean_timing() const
 	{
-		return { mean_timing_, dt_mean_timing_ };
+		return {mean_timing_, dt_mean_timing_};
+	}
+
+	[[nodiscard]] std::vector<std::vector<double>> get_unfiltered_output() const
+	{
+		return unfiltered_output_;
 	}
 
 	[[nodiscard]] std::vector<double> get_cfs() const
 	{
 		return cfs_;
 	}
-
 };
-

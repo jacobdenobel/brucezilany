@@ -246,9 +246,9 @@ namespace utils
 		if (!input.empty() && step > 0) 
 			result.reserve((stop - start + step - 1) / step);
 
-		for (size_t i = start + step - 1; i < stop; i += step) {
+		for (size_t i = start + step - 1; i < stop; i += step) 
 			result.push_back(input[i]);
-		}
+		
 		return result;
 	}
 }

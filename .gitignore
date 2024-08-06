@@ -9,3 +9,7 @@ x64
 
 *.txt
 venv
+*.so
+*egg-info
+.vscode
+.mypy_cache

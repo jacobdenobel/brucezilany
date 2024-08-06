@@ -1,10 +1,13 @@
+import os
 import sys
 import numpy as np
 import matplotlib.pyplot as plt
 
-def get_array(file):
+def get_array(file, cleanup: bool = True):
     with open(file, "r") as f:
         data = f.read()
+    if cleanup:
+        os.remove(file)
     return np.array(list(map(float, data.split())))
 
 def get_t(n, t = None):

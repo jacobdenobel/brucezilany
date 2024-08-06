@@ -9,7 +9,7 @@
 
 #include <chrono>
 
-#include "bruce2018.h"
+#include "bruce.h"
 
 void test_adaptive_redocking()
 {
