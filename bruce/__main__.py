@@ -14,7 +14,7 @@ def plot_neurogram(t, y, data, name):
     plt.pcolor(
         t, y, data, cmap="viridis", vmin=0, vmax=data.max()
     )
-    # plt.yscale("log")
+    plt.yscale("log")
     plt.ylabel("frequency")
     plt.xlabel("time [s]")
     plt.colorbar()
