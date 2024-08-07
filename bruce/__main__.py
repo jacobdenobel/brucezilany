@@ -9,6 +9,18 @@ import bruce
 
 FIGURES = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data/data/figures")
 
+def plot_neurogram(t, y, data, name):
+    plt.figure(figsize=(9, 4))
+    plt.pcolor(
+        t, y / 1e3, data, cmap="viridis", vmin=0, vmax=data.max()
+    )
+    plt.yscale("log")
+    plt.ylabel("frequency")
+    plt.xlabel("time [s]")
+    plt.colorbar()
+    plt.savefig(f"{FIGURES}/{name}.png")
+    
+
 if __name__ == "__main__":
     os.makedirs(FIGURES, exist_ok=True)
 
@@ -33,17 +45,17 @@ if __name__ == "__main__":
     ng.create(stim, args.n_rep)
 
     binned_output = ng.get_unfiltered_output()
+    
     y = ng.get_cfs()
-    t = np.arange(binned_output.shape[1]) * args.bin_width
-
+    mean_timing, dt_mean = ng.get_mean_timing()
+    
     if args.plot:
-        plt.figure(figsize=(9, 4))
-        plt.pcolor(
-            t, y / 1e3, binned_output, cmap="viridis", vmin=0, vmax=binned_output.max()
+        plot_neurogram(
+            np.arange(binned_output.shape[1]) * args.bin_width, y, binned_output, 
+            f"{os.path.basename(args.path)}_binned"
         )
-        plt.yscale("log")
-        plt.ylabel("frequency")
-        plt.xlabel("time [s]")
-        plt.colorbar()
-        plt.savefig(f"{FIGURES}/{os.path.basename(args.path)}_neurogram.png")
-        # plt.show()
+        plot_neurogram(
+            np.arange(mean_timing.shape[1]) * args.dt_mean, y, mean_timing, 
+            f"{os.path.basename(args.path)}_mean"
+        )
+        
