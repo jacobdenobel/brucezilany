@@ -1,4 +1,5 @@
 import os
+import time
 import argparse
 
 import numpy as np
@@ -35,7 +36,11 @@ if __name__ == "__main__":
         plt.figure(figsize=(9, 4))
         plt.pcolor(t, y / 1e3, binned_output, cmap="viridis", vmin=0, vmax=binned_output.max())
         plt.yscale("log")
-        plt.show()
+        plt.ylabel("frequency")
+        plt.xlabel("time [s]")
+        plt.colorbar()
+        plt.savefig(f"../data/figures/{args.path}_neurogram.png")
+        # plt.show()
         
                    
 
