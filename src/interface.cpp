@@ -50,7 +50,7 @@ void define_stimulus(py::module m)
         .def("__repr__", [](const Stimulus &self)
              { return "<Stimulus (" + std::to_string(self.stimulus_duration) + "s " + std::to_string(self.sampling_rate) + " Hz)>"; });
 
-    m.def("from_file", &from_file, py::arg("path"), py::arg("verbose") = false);
+    m.def("from_file", &from_file, py::arg("path"), py::arg("verbose") = false, py::arg("sim_time") = 1.0);
     m.def("ramped_sine_wave", &ramped_sine_wave,
           py::arg("duration"),
           py::arg("simulation_duration"),
