@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 
 import bruce
 
-FIGURES = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data/figures")
+FIGURES = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data/data/figures")
 
 if __name__ == "__main__":
     os.makedirs(FIGURES, exist_ok=True)
