@@ -13,3 +13,4 @@ venv
 *egg-info
 .vscode
 .mypy_cache
+data2
