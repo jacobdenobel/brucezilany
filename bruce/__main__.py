@@ -12,9 +12,9 @@ FIGURES = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data/data/fi
 def plot_neurogram(t, y, data, name):
     plt.figure(figsize=(9, 4))
     plt.pcolor(
-        t, y / 1e3, data, cmap="viridis", vmin=0, vmax=data.max()
+        t, y, data, cmap="viridis", vmin=0, vmax=data.max()
     )
-    plt.yscale("log")
+    # plt.yscale("log")
     plt.ylabel("frequency")
     plt.xlabel("time [s]")
     plt.colorbar()
