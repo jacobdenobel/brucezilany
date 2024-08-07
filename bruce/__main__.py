@@ -7,7 +7,11 @@ import matplotlib.pyplot as plt
 
 import bruce
 
+FIGURES = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data/figures")
+
 if __name__ == "__main__":
+    os.makedirs(FIGURES, exist_ok=True)
+    
     parser = argparse.ArgumentParser("Create a neurogram for a given WAV file at path")
     parser.add_argument("path", type=str)
     parser.add_argument("--n_cf", default=40, type=int)
@@ -39,7 +43,7 @@ if __name__ == "__main__":
         plt.ylabel("frequency")
         plt.xlabel("time [s]")
         plt.colorbar()
-        plt.savefig(f"../data/figures/{args.path}_neurogram.png")
+        plt.savefig(f".{FIGURES}/{os.path.basename(args.path)}_neurogram.png")
         # plt.show()
         
                    
