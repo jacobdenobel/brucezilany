@@ -65,7 +65,7 @@ namespace stimulus
 		data = resample(required_sample_rate, sample_rate, data);
 
 		const auto stim_duration = static_cast<double>(data.size()) * 1.0 / required_sample_rate;
-		auto stim = Stimulus(data, required_sample_rate, 1.2 * stim_duration);
+		auto stim = Stimulus(data, required_sample_rate, 1.05 * stim_duration);
 		return normalize_db(stim);
 	}
 }
