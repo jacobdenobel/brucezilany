@@ -142,7 +142,10 @@ void define_helper_objects(py::module m)
             return std::pair<py::array_t<double>, double>{create_2d_numpy_array(data), dt}; })
         .def("get_unfiltered_output", [](const Neurogram &self)
              { return create_2d_numpy_array(self.get_unfiltered_output()); })
-        .def("get_cfs", &Neurogram::get_cfs)
+        .def("get_cfs", [](const Neurogram &self){
+            const auto x = self.get_cfs();
+            return py::array(x.size(), x.data());
+        })
         .def_readwrite("bin_width", &Neurogram::bin_width);
 }
 
