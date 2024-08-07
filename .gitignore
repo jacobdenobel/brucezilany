@@ -14,3 +14,4 @@ venv
 .vscode
 .mypy_cache
 data2
+data3

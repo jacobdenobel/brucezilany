@@ -55,7 +55,7 @@ if __name__ == "__main__":
             f"{os.path.basename(args.path)}_binned"
         )
         plot_neurogram(
-            np.arange(mean_timing.shape[1]) * args.dt_mean, y, mean_timing, 
+            np.arange(mean_timing.shape[1]) * dt_mean, y, mean_timing, 
             f"{os.path.basename(args.path)}_mean"
         )
         
