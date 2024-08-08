@@ -1,13 +1,11 @@
 import os
-import pickle
-from dataclasses import dataclass
+import time
 import argparse
 
 import numpy as np
 import matplotlib.pyplot as plt
 
 import bruce
-
 
 FIGURES = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data/data/figures")
 
@@ -23,16 +21,6 @@ def plot_neurogram(t, y, data, save_to: str = None):
     if save_to is not None:
         plt.savefig(save_to)
     
-    
-class Neurogram:
-    y: np.array 
-    t: np.array
-    data: np.array
-    
-    def save(self, path: str):
-        with open(path, "wb") as f:    
-            pickle.dump(self, f) 
-        
 
 if __name__ == "__main__":
     os.makedirs(FIGURES, exist_ok=True)
@@ -44,7 +32,6 @@ if __name__ == "__main__":
     parser.add_argument("--n_rep", default=1, type=int)
     parser.add_argument("--bin_width", default=5e-4, type=float)
     parser.add_argument("--plot", action="store_true")
-    
     args = parser.parse_args()
 
     if not os.path.isfile(args.path):
