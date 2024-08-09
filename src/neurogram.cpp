@@ -110,8 +110,6 @@ void Neurogram::evaluate_fiber(
 			fiber.trel,
 			false);
 		auto output = utils::make_bins(out.psth, output_[0].size());
-		utils::scale(output, 1.0 / n_trials / bin_width);
-		
 		mutex_.lock();
 		utils::add(output_[cf_i], output);
 		mutex_.unlock();
