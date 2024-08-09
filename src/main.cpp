@@ -13,7 +13,6 @@
 
 void test_adaptive_redocking()
 {
-
 	// For adaptive redocking
 	static bool make_plots = true;
 	static int CF = (int)5e3;			   // CF in Hz;

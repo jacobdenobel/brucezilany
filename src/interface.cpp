@@ -40,7 +40,9 @@ void define_stimulus(py::module m)
     using namespace stimulus;
     py::class_<Stimulus>(m, "Stimulus")
         .def(py::init<const std::vector<double> &, size_t, double>(), py::arg("data"), py::arg("sampling_rate"), py::arg("simulation_duration"))
-        .def_readonly("data", &Stimulus::data)
+        .def_property_readonly("data", [](const Stimulus& self) {
+            return py::array(self.data.size(), self.data.data());
+        })
         .def_readonly("sampling_rate", &Stimulus::sampling_rate)
         .def_readonly("time_resolution", &Stimulus::time_resolution)
         .def_readonly("stimulus_duration", &Stimulus::stimulus_duration)
@@ -128,22 +130,14 @@ void define_helper_objects(py::module m)
         .def("create", &Neurogram::create,
              py::arg("sound_wave"),
              py::arg("n_rep") = 1,
+             py::arg("n_trials") = 1,
              py::arg("species") = HUMAN_SHERA,
              py::arg("noise_type") = RANDOM,
-             py::arg("power_law") = APPROXIMATED,
-             py::arg("filtered_neurograms") = false
+             py::arg("power_law") = APPROXIMATED
         )
         .def("get_fibers", &Neurogram::get_fibers, py::arg("cf_idx"))
-        .def("get_fine_timing", [](const Neurogram &self)
-             {
-            const auto [data, dt] = self.get_fine_timing();
-            return std::pair<py::array_t<double>, double>{create_2d_numpy_array(data), dt}; })
-        .def("get_mean_timing", [](const Neurogram &self)
-             {
-            const auto [data, dt] = self.get_mean_timing();
-            return std::pair<py::array_t<double>, double>{create_2d_numpy_array(data), dt}; })
-        .def("get_unfiltered_output", [](const Neurogram &self)
-             { return create_2d_numpy_array(self.get_unfiltered_output()); })
+        .def("get_output", [](const Neurogram &self)
+             { return create_2d_numpy_array(self.get_output()); })
         .def("get_cfs", [](const Neurogram &self){
             const auto x = self.get_cfs();
             return py::array(x.size(), x.data());

@@ -67,6 +67,7 @@
         "set": "cpp",
         "unordered_set": "cpp",
         "typeindex": "cpp",
-        "variant": "cpp"
+        "variant": "cpp",
+        "ranges": "cpp"
     }
 }

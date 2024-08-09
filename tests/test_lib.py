@@ -26,15 +26,8 @@ class TestCase(unittest.TestCase):
         ng.bin_width = stim.time_resolution
 
         ng.create(stim, 1)
-        fine_timing, _ = ng.get_fine_timing()
-        self.assertEqual(fine_timing.shape[0], 2)
-        self.assertEqual(fine_timing.shape[1], int(stim.n_simulation_timesteps / 16))
 
-        mean_timing, _ = ng.get_mean_timing()
-        self.assertEqual(mean_timing.shape[0], 2)
-        self.assertEqual(mean_timing.shape[1], int(stim.n_simulation_timesteps / 64 / 10))
-
-        binned_output = ng.get_unfiltered_output()
+        binned_output = ng.get_output()
         self.assertEqual(binned_output.shape[0], 2)
         self.assertEqual(binned_output.shape[1], int(stim.n_simulation_timesteps / (ng.bin_width / stim.time_resolution)))
     

@@ -15,9 +15,7 @@ Neurogram::Neurogram(
 						   coh_cs_(cfs.size(), 1.0),
 						   ihc_cs_(cfs.size(), 1.0),
 						   ohc_loss_(cfs.size(), 0.0),
-						   an_population_(generate_an_population(cfs.size(), n_low, n_med, n_high)),
-						   hamming_window_ft_(utils::hamming(32)),
-						   hamming_window_mr_(utils::hamming(128))
+						   an_population_(generate_an_population(cfs.size(), n_low, n_med, n_high))
 {
 }
 
@@ -85,12 +83,11 @@ void Neurogram::evaluate_fiber(
 	const stimulus::Stimulus &sound_wave,
 	const std::vector<double> &ihc,
 	const int n_rep,
+	const int n_trials,
 	const NoiseType noise_type,
 	const PowerLaw power_law,
 	const Fiber &fiber,
-	const size_t cf_i,
-    const bool filtered_neurograms
-)
+	const size_t cf_i)
 {
 	const auto pla = synapse_mapping::map(
 		ihc,
@@ -99,44 +96,37 @@ void Neurogram::evaluate_fiber(
 		sound_wave.time_resolution,
 		SOFTPLUS);
 
-	const auto out = synapse(
-		pla,
-		cfs_[cf_i],
-		n_rep,
-		sound_wave.n_simulation_timesteps,
-		sound_wave.time_resolution,
-		noise_type,
-		power_law,
-		fiber.spont,
-		fiber.tabs,
-		fiber.trel,
-		false);
+	for(int i = 0; i < n_trials; i++) {
+		const auto out = synapse(
+			pla,
+			cfs_[cf_i],
+			n_rep,
+			sound_wave.n_simulation_timesteps,
+			sound_wave.time_resolution,
+			noise_type,
+			power_law,
+			fiber.spont,
+			fiber.tabs,
+			fiber.trel,
+			false);
+		auto output = utils::make_bins(out.psth, output_[0].size());
+		utils::scale(output, 1.0 / n_trials / bin_width);
+		
+		mutex_.lock();
+		utils::add(output_[cf_i], output);
+		mutex_.unlock();
+	}
 
-	const auto unfiltered_output = utils::make_bins(out.psth, unfiltered_output_[0].size());
-    mutex_.lock();
-	utils::add(unfiltered_output_[cf_i], unfiltered_output);
-	mutex_.unlock();
-
-    if (filtered_neurograms) 
-    {
-    	const auto filtered_output = utils::filter(hamming_window_ft_, out.psth);
-    	const auto mr_filtered_output = utils::filter(hamming_window_mr_, utils::make_bins(out.psth, mean_timing_[0].size()));
-    	mutex_.lock();
-    	utils::add(fine_timing_[cf_i], filtered_output);
-    	utils::add(mean_timing_[cf_i], mr_filtered_output);
-    	mutex_.unlock();
-    }
 }
 
 void Neurogram::evaluate_cf(
 	const stimulus::Stimulus &sound_wave,
 	const int n_rep,
+	const int n_trials,
 	const Species species,
 	const NoiseType noise_type,
 	const PowerLaw power_law,
-	const size_t cf_i, 
-    const bool filtered_neurograms
-)
+	const size_t cf_i)
 {
 	const auto fibers = get_fibers(cf_i);
 
@@ -148,7 +138,7 @@ void Neurogram::evaluate_cf(
 	std::vector<std::thread> threads(fibers.size());
 	for (size_t f_id = 0; f_id < fibers.size(); f_id++)
 		threads[f_id] = std::thread(
-			&Neurogram::evaluate_fiber, this, sound_wave, ihc, n_rep, noise_type, power_law, fibers[f_id], cf_i, filtered_neurograms);
+			&Neurogram::evaluate_fiber, this, sound_wave, ihc, n_rep, n_trials, noise_type, power_law, fibers[f_id], cf_i);
 
 	for (auto &th : threads)
 		th.join();
@@ -157,41 +147,20 @@ void Neurogram::evaluate_cf(
 void Neurogram::create(
 	const stimulus::Stimulus &sound_wave,
 	const int n_rep,
+	const int n_trials,
 	const Species species,
 	const NoiseType noise_type,
-	const PowerLaw power_law, 
-    const bool filtered_neurograms
-)
+	const PowerLaw power_law)
 {
-    if (filtered_neurograms)
-    {
-    	constexpr double mr_bin_width = 100e-6;
-    	const size_t n_bins = sound_wave.n_simulation_timesteps / static_cast<size_t>(std::round(mr_bin_width / sound_wave.time_resolution));
-    	fine_timing_ = std::vector(cfs_.size(), std::vector(sound_wave.n_simulation_timesteps, 0.0));
-    	mean_timing_ = std::vector(cfs_.size(), std::vector(n_bins, 0.0));
-    	dt_fine_timing_ = static_cast<double>(hamming_window_ft_.size()) / 2.0 * sound_wave.time_resolution;
-    	dt_mean_timing_ = static_cast<double>(hamming_window_mr_.size()) / 2.0 * sound_wave.time_resolution * mr_bin_width / sound_wave.time_resolution;
-    }
-
-    //TODO: check bin width >= sample rate
+	// TODO: check bin width >= sample rate
 	const size_t unfiltered_n_bins = sound_wave.n_simulation_timesteps / static_cast<size_t>(std::round(bin_width / sound_wave.time_resolution));
-	unfiltered_output_ = std::vector(cfs_.size(), std::vector(unfiltered_n_bins, 0.0));
+	output_ = std::vector(cfs_.size(), std::vector(unfiltered_n_bins, 0.0));
 
 	std::vector<std::thread> threads(cfs_.size());
 	for (size_t cf_i = 0; cf_i < cfs_.size(); cf_i++)
 		threads[cf_i] = std::thread(
-			&Neurogram::evaluate_cf, this, sound_wave, n_rep, species, noise_type, power_law, cf_i, filtered_neurograms);
+			&Neurogram::evaluate_cf, this, sound_wave, n_rep, n_trials, species, noise_type, power_law, cf_i);
 
 	for (auto &th : threads)
 		th.join();
-
-	if (filtered_neurograms)
-    {
-        // Resample
-    	for (auto &xc : fine_timing_)
-    		xc = utils::subsequence(xc, 0, xc.size(), hamming_window_ft_.size() / 2);
-    
-    	for (auto &xc : mean_timing_)
-    		xc = utils::subsequence(xc, 0, xc.size(), hamming_window_mr_.size() / 2);
-    }
 }
