@@ -1,6 +1,6 @@
 import os
 import pickle
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import argparse
 
 import numpy as np
@@ -12,22 +12,24 @@ import bruce
 FIGURES = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data/data/figures")
 
 def plot_neurogram(t, y, data, save_to: str = None):
-    plt.figure(figsize=(9, 4))
-    plt.pcolor(
+    fig, ax = plt.subplots(figsize=(9, 4))
+    ax.pcolor(
         t, y, data, cmap="viridis", vmin=0, vmax=data.max()
     )
-    plt.yscale("log")
-    plt.ylabel("frequency")
-    plt.xlabel("time [s]")
-    plt.colorbar()
+    ax.set_yscale("log")
+    ax.set_ylabel("frequency")
+    ax.set_xlabel("time [s]")
+    ax.colorbar()
     if save_to is not None:
         plt.savefig(save_to)
+    return as
     
     
 class Neurogram:
-    y: np.array 
-    t: np.array
-    data: np.array
+    f: np.array 
+    t: np.array = field(repr=None)
+    data: np.array = field(repr=None)
+    name: str = None
     
     def save(self, path: str):
         with open(path, "wb") as f:    

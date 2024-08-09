@@ -130,7 +130,9 @@ void define_helper_objects(py::module m)
              py::arg("n_rep") = 1,
              py::arg("species") = HUMAN_SHERA,
              py::arg("noise_type") = RANDOM,
-             py::arg("power_law") = APPROXIMATED)
+             py::arg("power_law") = APPROXIMATED,
+             py::arg("filtered_neurograms") = false
+        )
         .def("get_fibers", &Neurogram::get_fibers, py::arg("cf_idx"))
         .def("get_fine_timing", [](const Neurogram &self)
              {

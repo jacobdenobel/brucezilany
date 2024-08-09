@@ -78,7 +78,9 @@ public:
 		int n_rep,
 		Species species,
 		NoiseType noise_type,
-		PowerLaw power_law);
+		PowerLaw power_law,
+        bool filtered_neurograms = false
+    );
 
 	void evaluate_cf(
 		const stimulus::Stimulus &sound_wave,
@@ -86,7 +88,9 @@ public:
 		Species species,
 		NoiseType noise_type,
 		PowerLaw power_law,
-		size_t cf_i);
+		size_t cf_i,
+        bool filtered_neurograms
+);
 
 	void evaluate_fiber(
 		const stimulus::Stimulus &sound_wave,
@@ -95,7 +99,9 @@ public:
 		NoiseType noise_type,
 		PowerLaw power_law,
 		const Fiber &fiber,
-		size_t cf_i);
+		size_t cf_i, 
+        bool filtered_neurograms
+);
 
 	[[nodiscard]] std::pair<std::vector<std::vector<double>>, double> get_fine_timing() const
 	{
