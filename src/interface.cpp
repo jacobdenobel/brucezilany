@@ -173,14 +173,30 @@ void define_model_functions(py::module m)
           py::arg("spontaneous_firing_rate") = 100,
           py::arg("abs_refractory_period") = 0.7,
           py::arg("rel_refractory_period") = 0.6,
-          py::arg("calculate_stats") = true);
+          py::arg("calculate_stats") = true,
+          py::arg("rng") = std::nullopt
+    );
+}
+
+void define_utils(py::module m)
+{
+    using namespace utils;
+    m.def("set_seed", &set_seed);
+
+    py::class_<RandomGenerator>(m, "RandomGenerator")
+        .def(py::init<size_t>(), py::arg("seed") = SEED)
+        .def("rand1", &RandomGenerator::rand1)
+        .def("randn1", &RandomGenerator::randn1)
+        .def("fill_gaussian", &RandomGenerator::fill_gaussian, py::arg("x"))
+        ;
+
 }
 
 PYBIND11_MODULE(brucecpp, m)
 {
     m.doc() = "Python wrapper for Bruce hearing model";
-    m.def("set_seed", &utils::set_seed);
     define_types(m);
+    define_utils(m);
     define_stimulus(m.def_submodule("stimulus"));
     define_helper_objects(m);
     define_model_functions(m);

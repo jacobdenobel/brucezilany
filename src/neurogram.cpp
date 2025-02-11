@@ -34,7 +34,9 @@ std::vector<Fiber> Neurogram::generate_fiber_set(
 	const double c1,
 	const double c2,
 	const double lb,
-	const double ub)
+	const double ub,
+	utils::RandomGenerator& rng
+	)
 {
 	static double tabs_max = 1.5 * 461e-6;
 	static double tabs_min = 1.5 * 139e-6;
@@ -44,9 +46,9 @@ std::vector<Fiber> Neurogram::generate_fiber_set(
 	auto fibers = std::vector<Fiber>(n_cf * n_fibers);
 	for (auto &fiber : fibers)
 	{
-		const double ref_rand = utils::rand1();
+		const double ref_rand = rng.rand1();
 		fiber = Fiber{
-			std::min(std::max(c1 + c2 * utils::randn1(), lb), ub),
+			std::min(std::max(c1 + c2 * rng.randn1(), lb), ub),
 			(tabs_max - tabs_min) * ref_rand + tabs_min,
 			(trel_max - trel_min) * ref_rand + trel_min,
 			f_type};
@@ -61,10 +63,11 @@ std::array<std::vector<Fiber>, 3> Neurogram::generate_an_population(
 	const size_t n_med,
 	const size_t n_high)
 {
+	auto rng = utils::RandomGenerator(utils::SEED);
 	return {
-		generate_fiber_set(n_cf, n_low, LOW, .1, .1, 1e-3, .2),
-		generate_fiber_set(n_cf, n_med, MEDIUM, 4.0, 4.0, .2, 18.0),
-		generate_fiber_set(n_cf, n_high, HIGH, 70.0, 30, 18.0, 180.)};
+		generate_fiber_set(n_cf, n_low, LOW, .1, .1, 1e-3, .2, rng),
+		generate_fiber_set(n_cf, n_med, MEDIUM, 4.0, 4.0, .2, 18.0, rng),
+		generate_fiber_set(n_cf, n_high, HIGH, 70.0, 30, 18.0, 180.,rng)};
 }
 
 std::vector<Fiber> Neurogram::get_fibers(const size_t cf_idx) const
@@ -97,6 +100,7 @@ void Neurogram::evaluate_fiber(
 		SOFTPLUS);
 
 	for(int i = 0; i < n_trials; i++) {
+		auto rng = utils::RandomGenerator(utils::SEED + cf_i + n_trials);
 		const auto out = synapse(
 			pla,
 			cfs_[cf_i],
@@ -108,7 +112,9 @@ void Neurogram::evaluate_fiber(
 			fiber.spont,
 			fiber.tabs,
 			fiber.trel,
-			false);
+			false,
+			rng
+			);
 		auto output = utils::make_bins(out.psth, output_[0].size());
 		mutex_.lock();
 		utils::add(output_[cf_i], output);

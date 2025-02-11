@@ -66,6 +66,10 @@ namespace stimulus
 
 		const auto stim_duration = static_cast<double>(data.size()) * 1.0 / required_sample_rate;
 		auto stim = Stimulus(data, required_sample_rate, sim_time * stim_duration);
+		
+		if (sim_time == 1.0) // fix precision errors
+			stim.simulation_duration = stim.stimulus_duration;
+
 		return normalize_db(stim);
 	}
 }

@@ -101,7 +101,8 @@ namespace pla
 		const double sampling_frequency,
 		const double delay_point,
 		const double time_resolution,
-		const int n_total_timesteps
+		const int n_total_timesteps,
+		utils::RandomGenerator& rng
 	)
 	{
 		const double bin_width = 1 / sampling_frequency;
@@ -111,7 +112,7 @@ namespace pla
 		constexpr double beta2 = 1e-1;
 
 		const int n = static_cast<int>(floor((n_total_timesteps + 2.0 * delay_point) * time_resolution * sampling_frequency));
-		const auto random_numbers = utils::fast_fractional_gaussian_noise(n, noise, spontaneous_firing_rate);
+		const auto random_numbers = utils::fast_fractional_gaussian_noise(rng, n, noise, spontaneous_firing_rate);
 
 		std::vector<double> synapse_out(n);
 		if (impl == APPROXIMATED)

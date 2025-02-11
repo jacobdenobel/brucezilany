@@ -55,7 +55,9 @@ public:
 		double c1,
 		double c2,
 		double lb,
-		double ub);
+		double ub,
+		utils::RandomGenerator& rng
+		);
 
 	static std::array<std::vector<Fiber>, 3> generate_an_population(
 		size_t n_cf,

@@ -3,6 +3,7 @@
 #include <vector>
 
 #include "types.h"
+#include "utils.h"
 
 
 namespace pla
@@ -72,7 +73,8 @@ namespace pla
 		double sampling_frequency,
 		double delay_point,
 		double time_resolution,
-		int n_total_timesteps
+		int n_total_timesteps,
+		utils::RandomGenerator& rng
 	);
 }
 

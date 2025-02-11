@@ -51,45 +51,57 @@ namespace utils
 	//! The random seed
 	extern int SEED;
 
-	//! The source of randomness
-	extern std::mt19937 GENERATOR;
-
 	/**
-	 * Set the global seed
-	 * @param seed the new value of the random seed
-	 */
+	* Set the global seed
+	* @param seed the new value of the random seed
+	*/
 	void set_seed(int seed);
 
-	/**
-	 * Generate a single uniform random number in [0, 1)
-	 * @return the number
-	 */
-	double rand1();
+	struct RandomGenerator {
+		std::mt19937 gen;
+		std::uniform_real_distribution<double> uniform;
+		std::normal_distribution<double> normal;
+
+		RandomGenerator(const size_t seed): gen(seed), uniform(0, 1.0), normal(0, 1.0) {}
+
+		/**
+		* Generate a single uniform random number in [0, 1)
+		* @return the number
+		*/
+		double rand1() 
+		{
+			return uniform(gen);
+		}
+
+		/**
+		* Generate a single standard normal (mu = 0, sigma = 1) random number
+		* @return the number
+		*/
+		double randn1() 
+		{
+			return normal(gen);
+		}
+
+		//! Fill a gaussian vector
+		void fill_gaussian(std::vector<double> &x) 
+		{
+			for (auto &xi : x)
+				xi = randn1();
+		}
+	};
 
 	/**
-	 * Generate a single standard normal (mu = 0, sigma = 1) random number
-	 * @return the number
-	 */
-	double randn1();
-
-	/**
-	 * Generate a vector of standard normally distributed random numbers
-	 * @param n the size of the vector
-	 * @return the vector with random numbers
-	 */
-	std::vector<double> randn(size_t n);
-
-	/**
-	 * @brief Fast (exact) fractional Gaussian noise and Brownian motion generator for a fixed Hurst
-	 * index of .9 and a fixed time resolution (tdres) of 1e-4.
-	 *
-	 *
-	 * @param n_out is the length of the output sequence.
-	 * @param noise type of random noise
-	 * @param mu the mean of the noise
-	 * @return returns a sequence of fractional Gaussian noise with a standard deviation of one.
-	 */
+	* @brief Fast (exact) fractional Gaussian noise and Brownian motion generator for a fixed Hurst
+	* index of .9 and a fixed time resolution (tdres) of 1e-4.
+	*
+	*
+	* @param n_out is the length of the output sequence.
+	* @param noise type of random noise
+	* @param mu the mean of the noise
+	* @return returns a sequence of fractional Gaussian noise with a standard deviation of one.
+	*/
 	std::vector<double> fast_fractional_gaussian_noise(
+		RandomGenerator& rng,
 		int n_out = 5300,
 		NoiseType noise = RANDOM,
 		double mu = 100

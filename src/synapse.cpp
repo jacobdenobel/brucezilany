@@ -53,6 +53,7 @@ namespace syn
 		const double spontaneous_firing_rate,
 		const double abs_refractory_period,
 		const double rel_refractory_period,
+		utils::RandomGenerator& rng,
 		SynapseOutput& res
 	)
 	{
@@ -74,10 +75,10 @@ namespace syn
 		/* Initial  preRelease_initialGuessTimeBins associated to nsites release sites */
 		for (size_t i = 0; i < nSites; i++)
 		{
-			one_site_redocking[i] = -t_rd_init * log(utils::rand1());
+			one_site_redocking[i] = -t_rd_init * log(rng.rand1());
 			previous_release_times_bins[i] = std::max(static_cast<double>(-res.n_total_timesteps),
 				ceil((nSites / std::max(res.synaptic_output[0], 0.1) + t_rd_init)
-					* log(utils::rand1()) / time_resolution));
+					* log(rng.rand1()) / time_resolution));
 		}
 
 		std::sort(previous_release_times_bins.begin(), previous_release_times_bins.end());
@@ -91,7 +92,7 @@ namespace syn
 		const int k_init = static_cast<int>(previous_release_times_bins[0]);
 
 		/* Current refractory time */
-		double t_ref = abs_refractory_period - rel_refractory_period * log(utils::rand1());
+		double t_ref = abs_refractory_period - rel_refractory_period * log(rng.rand1());
 
 		/*initial refractory regions */
 		double current_refractory_period = static_cast<double>(k_init) * time_resolution;
@@ -145,7 +146,7 @@ namespace syn
 				{
 					/* An event- a release  happened for the siteNo*/
 
-					one_site_redocking[site_no] = -current_redocking_period * log(utils::rand1());
+					one_site_redocking[site_no] = -current_redocking_period * log(rng.rand1());
 					current_release_times[site_no] = previous_release_times[site_no] + elapsed_time[site_no];
 					elapsed_time[site_no] = 0;
 
@@ -164,7 +165,7 @@ namespace syn
 						const double t_rel_k = std::min(
 							rel_refractory_period * 100 / res.synaptic_output[std::max(0, k)], rel_refractory_period);
 
-						t_ref = abs_refractory_period - t_rel_k * log(utils::rand1());
+						t_ref = abs_refractory_period - t_rel_k * log(rng.rand1());
 
 						current_refractory_period = current_release_times[site_no] + t_ref;
 					}
@@ -172,7 +173,7 @@ namespace syn
 					previous_release_times[site_no] = current_release_times[site_no];
 
 					x_sum[site_no] = 0;
-					unit_rate_interval[site_no] = static_cast<int>(-log(utils::rand1()) / time_resolution);
+					unit_rate_interval[site_no] = static_cast<int>(-log(rng.rand1()) / time_resolution);
 				}
 			}
 
@@ -273,13 +274,16 @@ syn::SynapseOutput synapse(
 	const double spontaneous_firing_rate, // spnt
 	const double abs_refractory_period, // tabs
 	const double rel_refractory_period, // trel,
-	const bool calculate_stats
+	const bool calculate_stats,
+	std::optional<utils::RandomGenerator> rng
 )
 {
 	utils::validate_parameter(spontaneous_firing_rate, 1e-4, 180., "spontaneous_firing_rate");
 	utils::validate_parameter(n_rep, 0, std::numeric_limits<int>::max(), "n_rep");
 	utils::validate_parameter(abs_refractory_period, 0., 20e-3, "abs_refractory_period");
 	utils::validate_parameter(rel_refractory_period, 0., 20e-3, "rel_refractory_period");
+
+	auto rng_gen = rng.value_or(utils::RandomGenerator(utils::SEED));
 
 	auto res = syn::SynapseOutput(n_rep, static_cast<int>(n_timesteps));
 
@@ -289,7 +293,7 @@ syn::SynapseOutput synapse(
 
 
 	const auto pla_out = pla::power_law(amplitude_ihc, noise, pla_impl, spontaneous_firing_rate, sampling_frequency,
-		delay_point, time_resolution, res.n_total_timesteps);
+		delay_point, time_resolution, res.n_total_timesteps, rng_gen);
 
 	up_sample_synaptic_output(pla_out, time_resolution, sampling_frequency, delay_point, res);
 
@@ -297,7 +301,7 @@ syn::SynapseOutput synapse(
 	///*======  Synaptic Release/Spike Generation Parameters ======*/
 	constexpr int n_sites = 4; /* Number of synaptic release sites */
 	const int n_spikes = syn::spike_generator<n_sites>(time_resolution, spontaneous_firing_rate, abs_refractory_period,
-		rel_refractory_period, res);
+		rel_refractory_period, rng_gen, res);
 
 	if (calculate_stats)
 		calculate_refractory_and_redocking_stats(

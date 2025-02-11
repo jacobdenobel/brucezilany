@@ -40,14 +40,13 @@ namespace
 		return z_mag;
 	}
 
-	void fill_gaussian(std::vector<double> &x)
-	{
-		static std::normal_distribution<double> d(0, 1.0);
-		for (auto &xi : x)
-			xi = d(utils::GENERATOR);
-	}
 
-	void fill_noise_vectors(std::vector<double> &zr1, std::vector<double> &zr2, const NoiseType noise)
+	void fill_noise_vectors(
+		std::vector<double> &zr1, 
+		std::vector<double> &zr2, 
+		const NoiseType noise,
+		utils::RandomGenerator& gen		
+	)
 	{
 		switch (noise)
 		{
@@ -76,11 +75,11 @@ namespace
 				-0.087690563274934, 0.231624682299529, -0.563183338456413, -1.188876899529859};
 			break;
 		case FIXED_SEED:
-			utils::GENERATOR.seed(42);
+			gen.gen.seed(42);
 			[[fallthrough]];
 		default:
-			fill_gaussian(zr1);
-			fill_gaussian(zr2);
+			gen.fill_gaussian(zr1);
+			gen.fill_gaussian(zr2);
 		}
 	}
 }
@@ -88,42 +87,13 @@ namespace
 namespace utils
 {
 	int SEED = 42;
-	std::mt19937 GENERATOR(SEED);
 
 	void set_seed(const int seed)
 	{
 		SEED = seed;
-		GENERATOR.seed(SEED);
 	}
 
-	template <typename D>
-	std::vector<double> random(const size_t n, D &d)
-	{
-		std::vector<double> r(n);
-		for (auto &ri : r)
-			ri = d(GENERATOR);
-		return r;
-	}
-
-	double rand1()
-	{
-		thread_local std::uniform_real_distribution<double> d(0, 1.0);
-		return d(GENERATOR);
-	}
-
-	double randn1()
-	{
-		thread_local std::normal_distribution<double> d(0, 1.0);
-		return d(GENERATOR);
-	}
-
-	std::vector<double> randn(const size_t n)
-	{
-		thread_local std::normal_distribution<double> d(0, 1.0);
-		return random(n, d);
-	}
-
-	std::vector<double> fast_fractional_gaussian_noise(const int n_out, const NoiseType noise, const double mu)
+	std::vector<double> fast_fractional_gaussian_noise(RandomGenerator& rng, const int n_out, const NoiseType noise, const double mu)
 	{
 		// TODO check if n_out can change
 		using namespace std::complex_literals;
@@ -138,7 +108,7 @@ namespace utils
 		thread_local std::vector<double> zr1(z_mag.size());
 		thread_local std::vector<double> zr2(z_mag.size());
 
-		fill_noise_vectors(zr1, zr2, noise);
+		fill_noise_vectors(zr1, zr2, noise, rng);
 
 		for (size_t i = 0; i < z_mag.size(); i++)
 			z[i] = z_mag[i] * (zr1[i] + 1i * zr2[i]);

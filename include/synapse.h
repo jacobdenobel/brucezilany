@@ -1,6 +1,8 @@
 ﻿#pragma once
 
+#include <optional>
 #include <vector>
+#include "utils.h"
 
 namespace syn
 {
@@ -122,6 +124,7 @@ namespace syn
  * @param abs_refractory_period  the absolute refractory period in /s
  * @param rel_refractory_period the baselines mean relative refractory period in /s
  * @param calculate_stats Whether to calculate optional statistics
+ * @param rng Random generator object. If nullptr, global SEED will be used to instantiate
  */
 syn::SynapseOutput synapse(
 	const std::vector<double>& amplitude_ihc, // px
@@ -134,5 +137,6 @@ syn::SynapseOutput synapse(
 	double spontaneous_firing_rate = 100,
 	double abs_refractory_period = 0.7,
 	double rel_refractory_period = 0.6,
-	bool calculate_stats = true
+	bool calculate_stats = true,
+	std::optional<utils::RandomGenerator> rng = std::nullopt
 );
