@@ -68,6 +68,11 @@
         "unordered_set": "cpp",
         "typeindex": "cpp",
         "variant": "cpp",
-        "ranges": "cpp"
+        "ranges": "cpp",
+        "charconv": "cpp",
+        "csignal": "cpp",
+        "future": "cpp",
+        "shared_mutex": "cpp",
+        "cassert": "cpp"
     }
 }

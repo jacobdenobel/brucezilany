@@ -2,12 +2,13 @@
 #include <fstream>
 #include "utils.h"
 #include "resample.h"
+#include <cassert>
 
 namespace
 {
 	std::vector<double> generate_zmag(const size_t n_samples)
 	{
-		thread_local std::vector<double> z_mag;
+		/*thread_local*/ std::vector<double> z_mag;
 
 		// Only generate z_mag whenever n_samples changes
 		if (z_mag.size() != n_samples)
@@ -102,11 +103,11 @@ namespace utils
 
 		const size_t n_samples = static_cast<int>(std::max(10.0, std::ceil(n_out / resample_factor) + 1));
 
-		thread_local std::vector<double> y(n_samples);
-		thread_local std::vector<double> z_mag = generate_zmag(n_samples);
-		thread_local std::valarray<std::complex<double>> z(z_mag.size());
-		thread_local std::vector<double> zr1(z_mag.size());
-		thread_local std::vector<double> zr2(z_mag.size());
+		/*thread_local*/ std::vector<double> y(n_samples);
+		/*thread_local*/ std::vector<double> z_mag = generate_zmag(n_samples);
+		/*thread_local*/ std::valarray<std::complex<double>> z(z_mag.size());
+		/*thread_local*/ std::vector<double> zr1(z_mag.size());
+		/*thread_local*/ std::vector<double> zr2(z_mag.size());
 
 		fill_noise_vectors(zr1, zr2, noise, rng);
 
@@ -193,10 +194,15 @@ namespace utils
 	std::vector<double> make_bins(const std::vector<double> &x, const size_t n_bins)
 	{
 		const size_t binsize = x.size() / n_bins;
+		assert(binsize > 0);
 		std::vector<double> res(n_bins, 0.0);
 
-		for (size_t i = 1; i < n_bins; i++)
-			res[i] = std::accumulate(x.begin() + (i - 1) * binsize, x.begin() + i * binsize, 0.0);
+		for (size_t i = 1; i < n_bins + 1; i++)
+		{
+			auto start_idx = (i - 1) * binsize;
+			auto end_idx = i * binsize;
+			res[i-1] = std::accumulate(x.begin() + start_idx, x.begin() + end_idx, 0.0);
+		}
 		return res;
 	}
 
@@ -211,6 +217,7 @@ namespace utils
 
 	void add(std::vector<double> &x, const std::vector<double> &y)
 	{
+		assert(x.size() == y.size());
 		for (size_t i = 0; i < x.size(); i++)
 			x[i] += y[i];
 	}

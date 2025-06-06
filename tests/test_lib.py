@@ -31,6 +31,6 @@ class TestCase(unittest.TestCase):
         self.assertEqual(binned_output.shape[0], 2)
         self.assertEqual(binned_output.shape[1], int(stim.n_simulation_timesteps / (ng.bin_width / stim.time_resolution)))
     
-
+    
 if __name__ == "__main__":
     unittest.main()

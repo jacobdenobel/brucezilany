@@ -48,7 +48,7 @@ namespace stimulus
 		return stim;
 	};
 
-	Stimulus from_file(const std::string &path, const bool verbose, const double sim_time)
+	Stimulus from_file(const std::string &path, const bool verbose, const double sim_time, const bool normalize)
 	{
 		if (verbose)
 			std::cout << "loading file: " << path << "\n";
@@ -69,6 +69,9 @@ namespace stimulus
 		
 		if (sim_time == 1.0) // fix precision errors
 			stim.simulation_duration = stim.stimulus_duration;
+
+		if (!normalize)
+			return stim;
 
 		return normalize_db(stim);
 	}

@@ -4,6 +4,8 @@
 #include <mutex>
 #include "utils.h"
 #include "inner_hair_cell.h"
+#include "thread_pool.h"
+
 
 enum FiberType
 {
@@ -30,8 +32,9 @@ class Neurogram
 
 	std::array<std::vector<Fiber>, 3> an_population_;
 
-	std::vector<std::vector<double>> output_;
+	std::vector<std::vector<std::vector<double>>> output_;
 	std::mutex mutex_;
+	ctpl::thread_pool pool_;
 public:
 	double bin_width = 5e-4;
 
@@ -40,13 +43,17 @@ public:
 		const std::vector<double> &cfs,
 		size_t n_low = 10,
 		size_t n_med = 10,
-		size_t n_high = 30);
+		size_t n_high = 30,
+		int n_threads = -1
+	);
 
 	explicit Neurogram(
 		size_t n_cf = 40,
 		size_t n_low = 10,
 		size_t n_med = 10,
-		size_t n_high = 30);
+		size_t n_high = 30,
+		int n_threads = -1
+	);
 
 	static std::vector<Fiber> generate_fiber_set(
 		size_t n_cf,
@@ -97,7 +104,7 @@ public:
 		size_t cf_i
 	);
 
-	[[nodiscard]] std::vector<std::vector<double>> get_output() const
+	[[nodiscard]] std::vector<std::vector<std::vector<double>>> get_output() const
 	{
 		return output_;
 	}

@@ -2,20 +2,31 @@
 
 #include <cassert>
 #include <thread>
+#include <future>
 #include "synapse.h"
 #include "synapse_mapping.h"
+
+static int get_n_threads(const int n_jobs)
+{
+	const int processor_count = std::max(1, static_cast<int>(std::thread::hardware_concurrency()) - 1);
+    const int n_threads = n_jobs == -1 ? processor_count : std::min(std::max(1, n_jobs), processor_count);
+	return n_threads;
+}
 
 Neurogram::Neurogram(
 	const std::vector<double> &cfs,
 	const size_t n_low,
 	const size_t n_med,
-	const size_t n_high) : cfs_(cfs),
+	const size_t n_high,
+	const int n_threads
+) : cfs_(cfs),
 						   // assumes no hearing loss
 						   db_loss_(cfs.size(), 0.0),
 						   coh_cs_(cfs.size(), 1.0),
 						   ihc_cs_(cfs.size(), 1.0),
 						   ohc_loss_(cfs.size(), 0.0),
-						   an_population_(generate_an_population(cfs.size(), n_low, n_med, n_high))
+						   an_population_(generate_an_population(cfs.size(), n_low, n_med, n_high)),
+						   pool_(get_n_threads(n_threads))
 {
 }
 
@@ -23,7 +34,9 @@ Neurogram::Neurogram(
 	const size_t n_cf,
 	const size_t n_low,
 	const size_t n_med,
-	const size_t n_high) : Neurogram(utils::log_space(std::log10(250.0), std::log10(16e3), n_cf), n_low, n_med, n_high)
+	const size_t n_high,
+	const int n_threads
+) : Neurogram(utils::log_space(std::log10(250.0), std::log10(16e3), n_cf), n_low, n_med, n_high, n_threads)
 {
 }
 
@@ -67,7 +80,8 @@ std::array<std::vector<Fiber>, 3> Neurogram::generate_an_population(
 	return {
 		generate_fiber_set(n_cf, n_low, LOW, .1, .1, 1e-3, .2, rng),
 		generate_fiber_set(n_cf, n_med, MEDIUM, 4.0, 4.0, .2, 18.0, rng),
-		generate_fiber_set(n_cf, n_high, HIGH, 70.0, 30, 18.0, 180.,rng)};
+		generate_fiber_set(n_cf, n_high, HIGH, 70.0, 30, 18.0, 180.,rng)
+	};
 }
 
 std::vector<Fiber> Neurogram::get_fibers(const size_t cf_idx) const
@@ -100,7 +114,7 @@ void Neurogram::evaluate_fiber(
 		SOFTPLUS);
 
 	for(int i = 0; i < n_trials; i++) {
-		auto rng = utils::RandomGenerator(utils::SEED + cf_i + n_trials);
+		auto rng = utils::RandomGenerator(utils::SEED + (1 + cf_i) * (1 + i) * 1500);
 		const auto out = synapse(
 			pla,
 			cfs_[cf_i],
@@ -115,9 +129,11 @@ void Neurogram::evaluate_fiber(
 			false,
 			rng
 			);
-		auto output = utils::make_bins(out.psth, output_[0].size());
+
+		
+		auto output = utils::make_bins(out.psth, output_[0][0].size());
 		mutex_.lock();
-		utils::add(output_[cf_i], output);
+ 		utils::add(output_[cf_i][i], output);
 		mutex_.unlock();
 	}
 
@@ -135,17 +151,19 @@ void Neurogram::evaluate_cf(
 	const auto fibers = get_fibers(cf_i);
 
 	const auto ihc = inner_hair_cell(
-		sound_wave, cfs_[cf_i], n_rep, coh_cs_[cf_i], ihc_cs_[cf_i], species);
+		sound_wave, cfs_[cf_i], n_rep, coh_cs_[cf_i], ihc_cs_[cf_i], species
+	);
 
 	assert(ihc.size() / n_rep == sound_wave.n_simulation_timesteps);
 
-	std::vector<std::thread> threads(fibers.size());
-	for (size_t f_id = 0; f_id < fibers.size(); f_id++)
-		threads[f_id] = std::thread(
-			&Neurogram::evaluate_fiber, this, sound_wave, ihc, n_rep, n_trials, noise_type, power_law, fibers[f_id], cf_i);
+	auto evaluate_fiber_ = [this, n_rep, n_trials, noise_type, power_law, cf_i](
+		int idx, const Fiber& fiber, const std::vector<double>& ihc, const stimulus::Stimulus &sound_wave
+	){
+		return this->evaluate_fiber(sound_wave, ihc, n_rep, n_trials, noise_type, power_law, fiber, cf_i);
+	};
 
-	for (auto &th : threads)
-		th.join();
+	for (size_t f_id = 0; f_id < fibers.size(); f_id++)
+		pool_.push(evaluate_fiber_, fibers[f_id], ihc, sound_wave);
 }
 
 void Neurogram::create(
@@ -156,15 +174,22 @@ void Neurogram::create(
 	const NoiseType noise_type,
 	const PowerLaw power_law)
 {
-	// TODO: check bin width >= sample rate
-	const size_t unfiltered_n_bins = sound_wave.n_simulation_timesteps / static_cast<size_t>(std::round(bin_width / sound_wave.time_resolution));
-	output_ = std::vector(cfs_.size(), std::vector(unfiltered_n_bins, 0.0));
+	bin_width = std::max(bin_width, sound_wave.time_resolution);
+	const double time_ratio = bin_width / sound_wave.time_resolution;
+	const double n_bins_ratio = static_cast<double>(sound_wave.n_simulation_timesteps) / time_ratio;
+	const size_t n_bins = static_cast<size_t>(std::round(n_bins_ratio));
+	output_ = std::vector(cfs_.size(), std::vector(n_trials, std::vector(n_bins, 0.0)));
 
+	pool_.resize(std::max(static_cast<int>(pool_.size()) - static_cast<int>(cfs_.size()), static_cast<int>(cfs_.size())));
+	
 	std::vector<std::thread> threads(cfs_.size());
+
 	for (size_t cf_i = 0; cf_i < cfs_.size(); cf_i++)
 		threads[cf_i] = std::thread(
 			&Neurogram::evaluate_cf, this, sound_wave, n_rep, n_trials, species, noise_type, power_law, cf_i);
 
 	for (auto &th : threads)
 		th.join();
+
+	pool_.stop(true);
 }

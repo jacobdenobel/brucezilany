@@ -292,7 +292,9 @@ syn::SynapseOutput synapse(
 	const int delay_point = static_cast<int>(floor(7500 / (cf / 1e3)));
 
 
-	const auto pla_out = pla::power_law(amplitude_ihc, noise, pla_impl, spontaneous_firing_rate, sampling_frequency,
+	const auto pla_out = pla::power_law(
+		amplitude_ihc, noise, pla_impl, 
+		spontaneous_firing_rate, sampling_frequency,
 		delay_point, time_resolution, res.n_total_timesteps, rng_gen);
 
 	up_sample_synaptic_output(pla_out, time_resolution, sampling_frequency, delay_point, res);

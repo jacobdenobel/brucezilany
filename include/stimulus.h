@@ -36,7 +36,7 @@ namespace stimulus
 		}
 	};
 
-	Stimulus from_file(const std::string &path, bool verbose = true, double sim_time = 1.0);
+	Stimulus from_file(const std::string &path, bool verbose = true, double sim_time = 1.0, bool normalize = true);
 
 	Stimulus ramped_sine_wave(
 		double duration,

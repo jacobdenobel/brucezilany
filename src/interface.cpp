@@ -52,7 +52,7 @@ void define_stimulus(py::module m)
         .def("__repr__", [](const Stimulus &self)
              { return "<Stimulus (" + std::to_string(self.stimulus_duration) + "s " + std::to_string(self.sampling_rate) + " Hz)>"; });
 
-    m.def("from_file", &from_file, py::arg("path"), py::arg("verbose") = false, py::arg("sim_time") = 1.0);
+    m.def("from_file", &from_file, py::arg("path"), py::arg("verbose") = false, py::arg("sim_time") = 1.0, py::arg("normalize") = true);
     m.def("ramped_sine_wave", &ramped_sine_wave,
           py::arg("duration"),
           py::arg("simulation_duration"),
@@ -88,6 +88,30 @@ py::array_t<double> create_2d_numpy_array(const std::vector<std::vector<double>>
     return result;
 }
 
+py::array_t<double> vector_to_numpy(const std::vector<std::vector<std::vector<double>>>& vec) {
+    // Get the shape of the vector (Depth, Rows, Columns)
+    ssize_t depth = vec.size();
+    ssize_t rows = vec[0].size();
+    ssize_t cols = vec[0][0].size();
+    
+    std::array<ssize_t, 3> shape = {depth, rows, cols};
+
+    // Create NumPy array
+    py::array_t<double> arr(shape);
+    double* ptr = arr.mutable_data();
+    
+    // Fill the NumPy array with data from the vector
+    for (size_t i = 0; i < depth; ++i) {
+        for (size_t j = 0; j < rows; ++j) {
+            for (size_t k = 0; k < cols; ++k) {
+                ptr[i * rows * cols + j * cols + k] = vec[i][j][k];
+            }
+        }
+    }
+
+    return arr;
+}
+
 void define_helper_objects(py::module m)
 {
     py::class_<syn::SynapseOutput>(m, "SynapseOutput")
@@ -117,16 +141,19 @@ void define_helper_objects(py::module m)
         .def_readwrite("type", &Fiber::type);
 
     py::class_<Neurogram>(m, "Neurogram")
-        .def(py::init<size_t, size_t, size_t, size_t>(),
+        .def(py::init<size_t, size_t, size_t, size_t, int>(),
              py::arg("n_cf") = 40,
              py::arg("n_low") = 10,
              py::arg("n_med") = 10,
-             py::arg("n_high") = 30)
-        .def(py::init<std::vector<double>, size_t, size_t, size_t>(),
+             py::arg("n_high") = 30,
+             py::arg("n_threads") = -1)
+        .def(py::init<std::vector<double>, size_t, size_t, size_t, int>(),
              py::arg("cfs"),
              py::arg("n_low") = 10,
              py::arg("n_med") = 10,
-             py::arg("n_high") = 30)
+             py::arg("n_high") = 30,
+             py::arg("n_threads") = -1
+            )
         .def("create", &Neurogram::create,
              py::arg("sound_wave"),
              py::arg("n_rep") = 1,
@@ -137,7 +164,7 @@ void define_helper_objects(py::module m)
         )
         .def("get_fibers", &Neurogram::get_fibers, py::arg("cf_idx"))
         .def("get_output", [](const Neurogram &self)
-             { return create_2d_numpy_array(self.get_output()); })
+             { return vector_to_numpy(self.get_output()); })
         .def("get_cfs", [](const Neurogram &self){
             const auto x = self.get_cfs();
             return py::array(x.size(), x.data());
