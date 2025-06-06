@@ -6,7 +6,7 @@ jobs:
   build-test-python:
     strategy:
       matrix:
-        os: [ubuntu-20.04, windows-2022]
+        os: [ubuntu-22.04, windows-2022]
         python-version: [
           "3.9.x", 
           "3.10.x", 
