@@ -8,8 +8,6 @@ jobs:
       matrix:
         os: [ubuntu-20.04, windows-2022]
         python-version: [
-          "3.7.x", 
-          "3.8.x", 
           "3.9.x", 
           "3.10.x", 
           "3.11.x",

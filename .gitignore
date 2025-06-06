@@ -1,3 +1,59 @@
+# Byte-compiled / cache
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pkl
+
+# Virtual environments
+venv/
+.env/
+.venv/
+
+# Setuptools / dist
+build/
+dist/
+*.egg-info/
+
+# Shared object files from pybind11 or C++
+*.so
+*.dll
+*.dylib
+*.pyd
+*.a
+*.o
+*.out
+
+# Compiled CMake and Make files
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+
+# Logs and test output
+*.log
+*.tmp
+*.bak
+
+# IDEs
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Jupyter notebook checkpoints
+.ipynb_checkpoints/
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Backup files
+*~
+*.swp
+*.swo
+
+
 .ipynb_checkpoints
 build
 hearing_model.egg-info
