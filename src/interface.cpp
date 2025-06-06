@@ -95,11 +95,11 @@ py::array_t<double> create_2d_numpy_array(const std::vector<std::vector<double>>
 py::array_t<double> vector_to_numpy(const std::vector<std::vector<std::vector<double>>> &vec)
 {
     // Get the shape of the vector (Depth, Rows, Columns)
-    ssize_t depth = vec.size();
-    ssize_t rows = vec[0].size();
-    ssize_t cols = vec[0][0].size();
+    size_t depth = vec.size();
+    size_t rows = vec[0].size();
+    size_t cols = vec[0][0].size();
 
-    std::array<ssize_t, 3> shape = {depth, rows, cols};
+    std::array<size_t, 3> shape = {depth, rows, cols};
 
     // Create NumPy array
     py::array_t<double> arr(shape);
