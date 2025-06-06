@@ -22,7 +22,7 @@ else:
     ext._add_cflags(["/O2"])
 
 
-with open(os.path.join(os.path.dirname(__file__), "README.md")) as f:
+with open(os.path.join(os.path.dirname(__file__), "README.md", encoding="utf-8")) as f:
     long_description = f.read()
 
 setup(
