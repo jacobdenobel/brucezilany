@@ -1,14 +1,3 @@
-Perfect, Jacob — you've clearly put a lot of engineering effort into modernizing and exposing the Bruce-Zilany-Carney model via Python. Here's a **revised and complete `README.md`**, incorporating:
-
-* A summary of the model and its relevance,
-* An updated installation and usage guide (with `pip install .`),
-* A section listing **major changes/refactoring**,
-* A detailed breakdown of the two main C++ model components (`inner_hair_cell` and `synapse`),
-* Explanations of your new features, like the `Neurogram` class.
-
----
-
-````markdown
 # Bruce-Zilany-Carney Auditory Nerve Model (Python Interface)
 
 This repository provides a modern Python interface to the auditory periphery model developed by the Bruce, Zilany, and Carney labs. The model simulates spike train responses in auditory nerve fibers with detailed physiological realism.
