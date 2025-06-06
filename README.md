@@ -2,7 +2,7 @@
 
 This repository provides a modern Python interface to the auditory periphery model developed by the Bruce, Zilany, and Carney labs. The model simulates spike train responses in auditory nerve fibers with detailed physiological realism.
 
-It is implemented in **C++ with `pybind11`**, offering performance and modularity. All dependencies on Matlab have been removed, making it fully standalone and suitable for Python-based environments (e.g., ML, neurophysiology toolkits).
+It is implemented in **C++ with `pybind11`**, offering performance and modularity. All dependencies on Matlab have been removed, making it fully standalone and suitable for Python-based environments. 
 
 ---
 
@@ -19,16 +19,6 @@ This code is based on:
   Acoustics 2023, Sydney, Australia.
 
 > 📢 **Please cite both of the above if you publish research using this model or a modified version.**
-
----
-
-## ✅ Key Changes to the Original Code
-
-- **Standalone** C++ codebase — no Matlab needed
-- **Modernized C++14** — no raw pointers, RAII memory management
-- **Multi-threaded `Neurogram` class** — high-throughput auditory simulation across fibers
-- Clean Python bindings using **`pybind11`**
-- Full support for stimulus generation, IHC modeling, and synapse simulation
 
 ---
 
@@ -129,6 +119,63 @@ Returns:
 
 ---
 
+## 🎧 Stimulus Handling
+
+The `brucezilany.stimulus` module provides tools for generating and loading stimuli with precise control over sampling rate, duration, delay, and amplitude. This ensures accurate modeling of auditory nerve responses to various acoustic signals.
+
+### 📦 Stimulus Class
+
+Stimuli are represented as `Stimulus` objects that encapsulate both the waveform and simulation parameters.
+
+```python
+from brucezilany import stimulus
+
+# Create a sine wave burst with a ramped onset/offset
+stim = stimulus.ramped_sine_wave(
+    duration=0.25,              # duration of tone burst (s)
+    simulation_duration=0.3,    # total simulation time (s)
+    sampling_rate=100_000,      # sampling rate (Hz)
+    rt=2.5e-3,                  # rise/fall time (s)
+    delay=25e-3,                # delay before tone onset (s)
+    f0=5000,                    # frequency (Hz)
+    db=60.0                     # SPL (dB)
+)
+```
+
+You can inspect:
+
+```python
+print("Stimulus duration:", stim.stimulus_duration)
+print("Sampling rate:", stim.sampling_rate)
+print("Samples:", stim.data.shape)
+```
+
+---
+
+### 📂 Load from File
+
+You can also load `.wav` files (e.g., speech or natural sounds):
+
+```python
+stim = stimulus.from_file("data/defineit.wav", verbose=False)
+```
+
+By default, this:
+
+* Resamples to 100 kHz
+* Normalizes to 65 dB SPL
+* Pads with silence to match a simulation time of 1s
+
+---
+
+### 📐 Normalization
+
+If you want to adjust the dB level of a stimulus manually:
+
+```python
+stimulus.normalize_db(stim, stim_db=70)
+```
+
 ## 🧰 Additional Tools
 
 ### `Neurogram` class
@@ -167,6 +214,8 @@ Compared to the original code, the following major changes were made:
 * ✅ **Multi-threading support**
 
   * `Neurogram` uses parallel processing for simulating many CF/fiber combinations
+
+The original Matlab code can be found [here](https://www.ece.mcmaster.ca/~ibruce/zbcANmodel/zbcANmodel.htm). A reference to the code use to build this repository is included as a .zip file in the data/ folder.
 
 ---
 

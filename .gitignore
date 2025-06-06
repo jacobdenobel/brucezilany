@@ -72,3 +72,5 @@ venv
 .mypy_cache
 data2
 data3
+
+data/BEZ2018a_model
