@@ -6,7 +6,7 @@ import argparse
 import numpy as np
 import matplotlib.pyplot as plt
 
-import bruce
+import brucezilany
 
 
 FIGURES = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data/data/figures")
@@ -52,11 +52,11 @@ if __name__ == "__main__":
     if not os.path.isfile(args.path):
         raise FileNotFoundError(args.path + " not found")
 
-    bruce.set_seed(args.seed)
+    brucezilany.set_seed(args.seed)
     np.random.seed(args.seed)
 
-    stim = bruce.stimulus.from_file(args.path, True)
-    ng = bruce.Neurogram(args.n_cf)
+    stim = brucezilany.stimulus.from_file(args.path, True)
+    ng = brucezilany.Neurogram(args.n_cf)
     ng.bin_width = args.bin_width
     ng.create(stim, args.n_rep)
 

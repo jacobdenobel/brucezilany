@@ -219,7 +219,7 @@ void define_utils(py::module m)
 
 }
 
-PYBIND11_MODULE(brucecpp, m)
+PYBIND11_MODULE(brucezilanycpp, m)
 {
     m.doc() = "Python wrapper for Bruce hearing model";
     define_types(m);

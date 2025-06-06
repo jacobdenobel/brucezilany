@@ -1,15 +1,14 @@
 import os
-import subprocess
 import platform
 from glob import glob
-from setuptools import setup
+from setuptools import setup, find_packages
 
 from pybind11.setup_helpers import Pybind11Extension, build_ext
 
 __version__ = "0.0.1"
 
 ext = Pybind11Extension(
-    "bruce.brucecpp", 
+    "brucezilany.brucezilanycpp", 
     [x for x in glob("src/*cpp") if "main.cpp" not in x], 
     include_dirs=["include"],
     cxx_std=17
@@ -24,23 +23,40 @@ else:
 
 
 with open(os.path.join(os.path.dirname(__file__), "README.md")) as f:
-    description = f.read()
+    long_description = f.read()
 
 setup(
-    name="bruce",
+    name="brucezilany",
+    version=__version__,
     author="Jacob de Nobel",
+    author_email="jacobdenobel@gmail.com", 
+    description="Python/C++ interface to the Bruce-Zilany-Carney auditory nerve model",
+    long_description=long_description,
+    long_description_content_type="text/markdown",
+    url="https://github.com/jacobdenobel/brucezilany", 
+    project_urls={
+        "Original Model": "https://www.ece.mcmaster.ca/~ibruce/zbcANmodel/zbcANmodel.htm",
+        "Source": "https://github.com/jacobdenobel/brucezilany"
+    },
+    license="BSD-3-Clause OR Other (if applicable)",  
+    classifiers=[
+        "Programming Language :: Python :: 3",
+        "Programming Language :: C++",
+        "License :: OSI Approved :: BSD License",
+        "Operating System :: OS Independent",
+        "Topic :: Scientific/Engineering :: Bio-Informatics",
+        "Intended Audience :: Science/Research",
+    ],
     ext_modules=[ext],
     cmdclass={"build_ext": build_ext},
-    description="",
-    long_description=description,
-    long_description_content_type="text/markdown",
-    packages=["bruce"],
+    packages=find_packages(include=["brucezilany", "brucezilany.*"]),
     zip_safe=False,
-    version=__version__,
+    python_requires=">=3.7",
     install_requires=[
-        "librosa",
-        "matplotlib",
         "numpy",
         "scipy",
+        "matplotlib",
+        "librosa",
     ],
+    include_package_data=True,
 )

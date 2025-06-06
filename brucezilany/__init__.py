@@ -1,6 +1,6 @@
 import numpy as np
 
-from .brucecpp import *
+from .brucezilanycpp import *
 
 BARK_SCALE = np.array([
     50,

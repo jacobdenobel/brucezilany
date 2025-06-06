@@ -5,14 +5,14 @@ from time import perf_counter
 import librosa
 import numpy as np
 
-import bruce
+import brucezilany
 
 
 class TestTiming(unittest.TestCase):
     def test_din(self):
-        bruce.set_seed(31)
+        brucezilany.set_seed(31)
         path = os.path.join(os.path.dirname(__file__), "025.wav")
-        stim = bruce.stimulus.from_file(path, False)
+        stim = brucezilany.stimulus.from_file(path, False)
 
         n_trials = 20
         n_fibers = 10
@@ -27,7 +27,7 @@ class TestTiming(unittest.TestCase):
         
         mel_scale = librosa.filters.mel_frequencies(n_mels, fmin=min_freq, fmax=max_freq)
 
-        ng = bruce.Neurogram(
+        ng = brucezilany.Neurogram(
             mel_scale,
             n_low=n_low_med,
             n_med=n_low_med,
