@@ -21,13 +21,15 @@ class TestCase(unittest.TestCase):
         self.assertEqual(stim.sampling_rate, int(100e3))
 
     def test_neurogram(self):
-        stim = brucezilany.stimulus.ramped_sine_wave(.1, .3, int(100e3), 2.5e-3, 25e-3, int(5e3), 60.0)
-        ng = brucezilany.Neurogram(2)
+        stim = brucezilany.stimulus.ramped_sine_wave(
+            .05, .1, int(100e3), 2.5e-3, 25e-3, int(5e3), 60.0
+        )
+        ng = brucezilany.Neurogram(2, 1, 1, 3)
         ng.bin_width = stim.time_resolution
 
         ng.create(stim, 1)
 
-        binned_output = ng.get_output()
+        binned_output = ng.get_output().sum(axis=1)
         self.assertEqual(binned_output.shape[0], 2)
         self.assertEqual(binned_output.shape[1], int(stim.n_simulation_timesteps / (ng.bin_width / stim.time_resolution)))
     

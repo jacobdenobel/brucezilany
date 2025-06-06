@@ -14,8 +14,8 @@ class TestTiming(unittest.TestCase):
         path = os.path.join(os.path.dirname(__file__), "025.wav")
         stim = brucezilany.stimulus.from_file(path, False)
 
-        n_trials = 20
-        n_fibers = 10
+        n_trials = 1
+        n_fibers = 6
         
         n_low_med = int(np.floor(n_fibers / 5))
         n_high = n_fibers - (2 * n_low_med)
@@ -36,9 +36,9 @@ class TestTiming(unittest.TestCase):
         )
         ng.bin_width = 1 / (max_freq * 2 * n_bins)
 
-        time = perf_counter()
+        # time = perf_counter()
         ng.create(stim, n_rep=1, n_trials=n_trials)
-        print(perf_counter() - time)
+        # print(perf_counter() - time)
         
 if __name__ == "__main__":
     unittest.main()
