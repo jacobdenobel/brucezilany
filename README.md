@@ -42,6 +42,14 @@ For development mode:
 pip install -e .
 ```
 
+### Install from PyPi
+
+Alternatively, you can also install the package from pip, if you want to include it as dependency.
+
+```bash
+pip install brucezilany
+```
+
 ---
 
 ## 🧪 Example Usage
