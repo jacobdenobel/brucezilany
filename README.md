@@ -22,7 +22,7 @@ This code is based on:
 
 ---
 
-## ✅ Key Features
+## ✅ Key Changes to the Original Code
 
 - **Standalone** C++ codebase — no Matlab needed
 - **Modernized C++14** — no raw pointers, RAII memory management
@@ -36,13 +36,13 @@ This code is based on:
 
 ### 1. Install prerequisites
 
-You need a working C++14 compiler and Python 3.7+. Use a virtual environment if needed.
+You need a working C++14 compiler and Python 3.9+. Use a virtual environment if needed.
 
 ### 2. Clone and install
 
 ```bash
-git clone https://github.com/yourusername/zilany-an-model-python.git
-cd zilany-an-model-python
+git clone https://github.com/jacobdenobel/brucezilany.git
+cd brucezilany
 pip install .
 ````
 
@@ -58,7 +58,7 @@ pip install -e .
 
 ```python
 import numpy as np
-from brucecpp import inner_hair_cell, synapse, stimulus
+from brucezilany import inner_hair_cell, synapse, stimulus
 
 # Generate a stimulus
 stim = stimulus.ramped_sine_wave(

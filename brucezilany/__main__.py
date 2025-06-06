@@ -22,7 +22,7 @@ def plot_neurogram(t, y, data, save_to: str = None):
     ax.colorbar()
     if save_to is not None:
         plt.savefig(save_to)
-    return as
+    return ax
     
     
 class Neurogram:
