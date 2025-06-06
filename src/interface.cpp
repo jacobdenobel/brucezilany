@@ -224,8 +224,8 @@ void define_model_functions(py::module m)
           py::arg("noise") = RANDOM,
           py::arg("pla_impl") = APPROXIMATED,
           py::arg("spontaneous_firing_rate") = 100,
-          py::arg("abs_refractory_period") = 0.7,
-          py::arg("rel_refractory_period") = 0.6,
+          py::arg("abs_refractory_period") = 0.7e-3,
+          py::arg("rel_refractory_period") = 0.6e-3,
           py::arg("calculate_stats") = true,
           py::arg("rng") = std::nullopt);
 }

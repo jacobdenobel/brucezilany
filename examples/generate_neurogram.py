@@ -1,6 +1,4 @@
 import os
-import pickle
-from dataclasses import dataclass, field
 import argparse
 
 import numpy as np
@@ -8,37 +6,18 @@ import matplotlib.pyplot as plt
 
 import brucezilany
 
-
-FIGURES = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data/data/figures")
-
 def plot_neurogram(t, y, data, save_to: str = None):
-    fig, ax = plt.subplots(figsize=(9, 4))
-    ax.pcolor(
+    plt.figure(figsize=(9, 4))
+    plt.pcolor(
         t, y, data, cmap="viridis", vmin=0, vmax=data.max()
     )
-    ax.set_yscale("log")
-    ax.set_ylabel("frequency")
-    ax.set_xlabel("time [s]")
-    ax.colorbar()
-    if save_to is not None:
-        plt.savefig(save_to)
-    return ax
+    plt.yscale("log")
+    plt.ylabel("frequency")
+    plt.xlabel("time [s]")
+    plt.colorbar()
+    plt.show()
     
-    
-class Neurogram:
-    f: np.array 
-    t: np.array = field(repr=None)
-    data: np.array = field(repr=None)
-    name: str = None
-    
-    def save(self, path: str):
-        with open(path, "wb") as f:    
-            pickle.dump(self, f) 
-        
-
 if __name__ == "__main__":
-    os.makedirs(FIGURES, exist_ok=True)
-
     parser = argparse.ArgumentParser("Create a neurogram for a given WAV file at path")
     parser.add_argument("path", type=str)
     parser.add_argument("--n_cf", default=40, type=int)
@@ -60,18 +39,9 @@ if __name__ == "__main__":
     ng.bin_width = args.bin_width
     ng.create(stim, args.n_rep)
 
-    binned_output = ng.get_unfiltered_output()
-    
     y = ng.get_cfs()
-    mean_timing, dt_mean = ng.get_mean_timing()
-    
-    if args.plot:
-        plot_neurogram(
-            np.arange(binned_output.shape[1]) * args.bin_width, y, binned_output, 
-            f"{FIGURES}/{os.path.basename(args.path)}_binned.png"
-        )
-        plot_neurogram(
-            np.arange(mean_timing.shape[1]) * dt_mean, y, mean_timing, 
-            f"{FIGURES}/{os.path.basename(args.path)}_mean.png"
-        )
+    binned_output = ng.get_output().sum(axis=1)
+    plot_neurogram(
+        np.arange(binned_output.shape[1]) * args.bin_width, y, binned_output, 
+    )
         
