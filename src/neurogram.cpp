@@ -132,9 +132,8 @@ void Neurogram::evaluate_fiber(
 
 		
 		auto output = utils::make_bins(out.psth, output_[0][0].size());
-		mutex_.lock();
+		const std::lock_guard<std::mutex> lock(mutex_);
  		utils::add(output_[cf_i][i], output);
-		mutex_.unlock();
 	}
 
 }
@@ -156,14 +155,14 @@ void Neurogram::evaluate_cf(
 
 	assert(ihc.size() / n_rep == sound_wave.n_simulation_timesteps);
 
-	auto evaluate_fiber_ = [this, n_rep, n_trials, noise_type, power_law, cf_i](
-		int idx, const Fiber& fiber, const std::vector<double>& ihc, const stimulus::Stimulus &sound_wave
+	auto evaluate_fiber_ = [this, n_rep, n_trials, noise_type, power_law, cf_i, &ihc, &sound_wave](
+		int idx, const Fiber& fiber
 	){
 		return this->evaluate_fiber(sound_wave, ihc, n_rep, n_trials, noise_type, power_law, fiber, cf_i);
 	};
 
 	for (size_t f_id = 0; f_id < fibers.size(); f_id++)
-		pool_.push(evaluate_fiber_, fibers[f_id], ihc, sound_wave);
+		pool_.push(evaluate_fiber_, fibers[f_id]);
 }
 
 void Neurogram::create(
