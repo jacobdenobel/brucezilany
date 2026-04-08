@@ -180,16 +180,8 @@ void Neurogram::create(
 	const size_t n_bins = static_cast<size_t>(std::round(n_bins_ratio));
 	output_ = std::vector(cfs_.size(), std::vector(n_trials, std::vector(n_bins, 0.0)));
 
-	pool_.resize(std::max(static_cast<int>(pool_.size()) - static_cast<int>(cfs_.size()), static_cast<int>(cfs_.size())));
-	
-	std::vector<std::thread> threads(cfs_.size());
-
 	for (size_t cf_i = 0; cf_i < cfs_.size(); cf_i++)
-		threads[cf_i] = std::thread(
-			&Neurogram::evaluate_cf, this, sound_wave, n_rep, n_trials, species, noise_type, power_law, cf_i);
-
-	for (auto &th : threads)
-		th.join();
-
+		evaluate_cf(sound_wave, n_rep, n_trials, species, noise_type, power_law, cf_i);
+	
 	pool_.stop(true);
 }
