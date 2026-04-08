@@ -40,6 +40,7 @@
 
 #include <iostream>
 #include <vector>
+#include <cstdint>
 #include <cassert>
 #include <string>
 #include <cstring>

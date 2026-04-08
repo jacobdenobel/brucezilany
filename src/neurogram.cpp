@@ -155,14 +155,22 @@ void Neurogram::evaluate_cf(
 
 	assert(ihc.size() / n_rep == sound_wave.n_simulation_timesteps);
 
+
 	auto evaluate_fiber_ = [this, n_rep, n_trials, noise_type, power_law, cf_i, &ihc, &sound_wave](
 		int idx, const Fiber& fiber
 	){
 		return this->evaluate_fiber(sound_wave, ihc, n_rep, n_trials, noise_type, power_law, fiber, cf_i);
 	};
+	
+	std::vector<std::future<void>> futures;
+	futures.reserve(fibers.size());
 
-	for (size_t f_id = 0; f_id < fibers.size(); f_id++)
-		pool_.push(evaluate_fiber_, fibers[f_id]);
+	for (size_t f_id = 0; f_id < fibers.size(); f_id++) 
+		futures.push_back(pool_.push(evaluate_fiber_, fibers[f_id]));
+
+	for (auto& future : futures)
+		future.get();
+	
 }
 
 void Neurogram::create(
