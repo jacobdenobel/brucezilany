@@ -5,7 +5,7 @@ from setuptools import setup, find_packages
 
 from pybind11.setup_helpers import Pybind11Extension, build_ext
 
-__version__ = "0.0.1"
+__version__ = "0.0.4"
 
 ext = Pybind11Extension(
     "brucezilany.brucezilanycpp", 

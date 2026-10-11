@@ -132,9 +132,8 @@ void Neurogram::evaluate_fiber(
 
 		
 		auto output = utils::make_bins(out.psth, output_[0][0].size());
-		mutex_.lock();
+		const std::lock_guard<std::mutex> lock(mutex_);
  		utils::add(output_[cf_i][i], output);
-		mutex_.unlock();
 	}
 
 }
@@ -156,14 +155,22 @@ void Neurogram::evaluate_cf(
 
 	assert(ihc.size() / n_rep == sound_wave.n_simulation_timesteps);
 
-	auto evaluate_fiber_ = [this, n_rep, n_trials, noise_type, power_law, cf_i](
-		int idx, const Fiber& fiber, const std::vector<double>& ihc, const stimulus::Stimulus &sound_wave
+
+	auto evaluate_fiber_ = [this, n_rep, n_trials, noise_type, power_law, cf_i, &ihc, &sound_wave](
+		int idx, const Fiber& fiber
 	){
 		return this->evaluate_fiber(sound_wave, ihc, n_rep, n_trials, noise_type, power_law, fiber, cf_i);
 	};
+	
+	std::vector<std::future<void>> futures;
+	futures.reserve(fibers.size());
 
-	for (size_t f_id = 0; f_id < fibers.size(); f_id++)
-		pool_.push(evaluate_fiber_, fibers[f_id], ihc, sound_wave);
+	for (size_t f_id = 0; f_id < fibers.size(); f_id++) 
+		futures.push_back(pool_.push(evaluate_fiber_, fibers[f_id]));
+
+	for (auto& future : futures)
+		future.get();
+	
 }
 
 void Neurogram::create(
@@ -180,16 +187,8 @@ void Neurogram::create(
 	const size_t n_bins = static_cast<size_t>(std::round(n_bins_ratio));
 	output_ = std::vector(cfs_.size(), std::vector(n_trials, std::vector(n_bins, 0.0)));
 
-	pool_.resize(std::max(static_cast<int>(pool_.size()) - static_cast<int>(cfs_.size()), static_cast<int>(cfs_.size())));
-	
-	std::vector<std::thread> threads(cfs_.size());
-
 	for (size_t cf_i = 0; cf_i < cfs_.size(); cf_i++)
-		threads[cf_i] = std::thread(
-			&Neurogram::evaluate_cf, this, sound_wave, n_rep, n_trials, species, noise_type, power_law, cf_i);
-
-	for (auto &th : threads)
-		th.join();
-
+		evaluate_cf(sound_wave, n_rep, n_trials, species, noise_type, power_law, cf_i);
+	
 	pool_.stop(true);
 }
