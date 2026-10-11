@@ -3,6 +3,20 @@
 
 namespace stimulus
 {
+	
+	void Stimulus::trim(const double new_duration) 
+	{
+		if (new_duration >= stimulus_duration)
+			return;
+		
+		const double trim_ratio = new_duration / stimulus_duration;
+		n_stimulation_timesteps *= trim_ratio;
+		n_simulation_timesteps *= trim_ratio;
+		stimulus_duration = static_cast<double>(n_stimulation_timesteps) * time_resolution;
+		simulation_duration =  static_cast<double>(n_simulation_timesteps) * time_resolution;
+		data.resize(n_stimulation_timesteps);
+	}
+	
 	Stimulus ramped_sine_wave(
 		const double duration,
 		const double simulation_duration,
@@ -35,6 +49,7 @@ namespace stimulus
 		}
 		return stim;
 	}
+
 
 	Stimulus normalize_db(Stimulus &stim, const double stim_db)
 	{
@@ -75,4 +90,6 @@ namespace stimulus
 
 		return normalize_db(stim);
 	}
+
+	
 }

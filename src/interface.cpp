@@ -48,6 +48,7 @@ void define_stimulus(py::module m)
         .def_readonly("simulation_duration", &Stimulus::simulation_duration)
         .def_readonly("n_stimulation_timesteps", &Stimulus::n_stimulation_timesteps)
         .def_readonly("n_simulation_timesteps", &Stimulus::n_simulation_timesteps)
+        .def("trim", &Stimulus::trim, py::arg("new_duration"))
         .def("__repr__", [](const Stimulus &self)
              { return "<Stimulus (" + std::to_string(self.stimulus_duration) + "s " + std::to_string(self.sampling_rate) + " Hz)>"; });
 

@@ -34,6 +34,8 @@ namespace stimulus
 												n_simulation_timesteps(static_cast<size_t>(std::ceil(simulation_duration / time_resolution)))
 		{
 		}
+		
+		void trim(double new_duration);
 	};
 
 	Stimulus from_file(const std::string &path, bool verbose = true, double sim_time = 1.0, bool normalize = true);
@@ -48,4 +50,5 @@ namespace stimulus
 		double db);
 
 	Stimulus normalize_db(Stimulus &stim, double stim_db = 65);
+
 }
