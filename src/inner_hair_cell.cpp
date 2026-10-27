@@ -159,8 +159,7 @@ namespace ihc
 		order(3),
 		cf(cf),
 		delta_phase(-TWO_PI * center_freq * time_resolution),
-		phase(0.0),
-		previous_gain(0.0)
+		phase(0.0)
 	{
 		const double gain = std::max(std::min(52.0 / 2.0 * (tanh(2.2 * log10(cf / 0.6e3) + 0.15) + 1.0), 60.0), 15.0);
 		const double ratio = pow(10, (-gain / (20.0 * order)));
@@ -180,8 +179,12 @@ namespace ihc
 		tmpcos = cos(TWO_PI * (center_freq - cf) * time_resolution);
 		gain_delay.resize(size_t{ 1 } + static_cast<size_t>(floor(1.0 / (2.0 * std::sqrt(1 - pow(tmpcos, 2))))));
 
-		shift_poles(cohc * (bm_tau_max - bm_tau_min) + bm_tau_min, 0);
-		wb_gain = previous_gain;
+		/* Initial control-path time constant and gain; as in model_IHC_BEZ2018a.c the initial
+		 * gain is also the gain applied at the first time step (tmpgain[0] = wbgain) */
+		const double bm_tau_init = cohc * (bm_tau_max - bm_tau_min) + bm_tau_min;
+		tau_wb = tau_wb_max + (bm_tau_init - bm_tau_max) * (tau_wb_max - tau_wb_min) / (bm_tau_max - bm_tau_min);
+		wb_gain = calculate_gain_delay().first;
+		gain_delay[0] = wb_gain;
 	}
 
 	double WideBandGammaToneFilter::operator()(const double me_out)
@@ -213,13 +216,13 @@ namespace ihc
 
 		const auto [current_gain, current_gain_delay] = calculate_gain_delay();
 
-		gain_delay[(n + current_gain_delay) % gain_delay.size()] = previous_gain;
+		/* As in model_IHC_BEZ2018a.c: the gain computed now is applied after its group delay
+		 * (tmpgain[grd+n] = wb_gain); if no gain is due at this step, the last applied gain is kept
+		 * (tmpgain[n] = lasttmpgain). wb_gain still holds the last applied gain here. */
+		gain_delay[(n + current_gain_delay) % gain_delay.size()] = current_gain;
 
-		// TODO: can we optimize this?
 		if (gain_delay[n % gain_delay.size()] == 0)
-			gain_delay[n % gain_delay.size()] = previous_gain;
-
-		previous_gain = current_gain;
+			gain_delay[n % gain_delay.size()] = wb_gain;
 
 		wb_gain = gain_delay[n % gain_delay.size()];
 		gain_delay[n % gain_delay.size()] = 0.0;

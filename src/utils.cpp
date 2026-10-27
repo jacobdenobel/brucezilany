@@ -101,7 +101,7 @@ namespace utils
 
 		constexpr int resample_factor = 1000;
 
-		const size_t n_samples = static_cast<int>(std::max(10.0, std::ceil(n_out / resample_factor) + 1));
+		const size_t n_samples = static_cast<int>(std::max(10.0, std::ceil(static_cast<double>(n_out) / resample_factor) + 1));
 
 		/*thread_local*/ std::vector<double> y(n_samples);
 		/*thread_local*/ std::vector<double> z_mag = generate_zmag(n_samples);

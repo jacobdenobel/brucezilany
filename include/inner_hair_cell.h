@@ -48,7 +48,6 @@ namespace ihc
 		double tmpcos;
 
 		std::vector<double> gain_delay;
-		double previous_gain;
 
 		WideBandGammaToneFilter(
 			double time_resolution,
