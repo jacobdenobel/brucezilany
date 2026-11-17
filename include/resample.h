@@ -404,8 +404,16 @@ std::vector<T> resample(int up_factor, int down_factor,
 	std::vector<T> firls_amplitude_v = { 1.0, 1.0, 0.0, 0.0 };
 	std::vector<T> coefficients = firls<T>(length - 1, firls_freqs_v, firls_amplitude_v);
 	std::vector<T> window = kaiser<T>(length, bta);
+	/* As MATLAB's resample: h = p*h/sum(h), i.e. the windowed filter is normalised to a DC gain of
+	 * exactly up_factor (without this the DC gain is ~0.99933 * up_factor for N = 10, beta = 5) */
+	T coefficient_sum = 0.0;
 	for (size_t i = 0; i < coefficients.size(); i++)
-		coefficients[i] *= up_factor * window[i];
+	{
+		coefficients[i] *= window[i];
+		coefficient_sum += coefficients[i];
+	}
+	for (size_t i = 0; i < coefficients.size(); i++)
+		coefficients[i] *= up_factor / coefficient_sum;
 
 	int length_half = (length - 1) / 2;
 	int nz = down_factor - length_half % down_factor;
